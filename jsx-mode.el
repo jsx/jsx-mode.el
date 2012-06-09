@@ -44,7 +44,7 @@
 
 (require 'thingatpt)
 
-(defconst jsx-version "0.0.1"
+(defconst jsx-version "0.0.2"
   "Version of `jsx-mode'")
 
 (defgroup jsx nil
@@ -374,10 +374,11 @@
 
 (defun jsx-indent-line ()
   (interactive)
-  (let ((indent-length (jsx-calculate-indentation)))
-    (if (not indent-length)
-        (setq indent-length (current-indentation)))
-    (indent-line-to indent-length)))
+  (let ((indent-length (jsx-calculate-indentation))
+        (offset (- (current-column) (current-indentation))))
+    (when indent-length
+      (indent-line-to indent-length)
+      (if (> offset 0) (forward-char offset)))))
 
 (defun jsx-calculate-indentation (&optional pos)
   (save-excursion
