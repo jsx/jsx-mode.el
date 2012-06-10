@@ -39,6 +39,8 @@
 ;;        })();
 ;; * support flymake
 ;; * support imenu
+;; * fix a bug that any token after implements is colored
+;;   e.g. 'J' will be colored in the code like 'class C implements I { J'
 
 ;;; Code:
 
@@ -237,6 +239,13 @@
 (defconst jsx--template-class-re
   (concat "<\\s-*\\(" jsx--identifier-re "\\)\\s-*>"))
 
+(defconst jsx--variable-definition-with-class-re
+  (concat
+   "\\<\\var\\s-+\\(" jsx--identifier-re "\\)"
+   "\\s-*:\\s-*"
+   "\\(?:" jsx--identifier-re "\\.\\)?"
+   "\\(" jsx--identifier-re "\\)""\\>"))
+
 ;; currently not support definitions like 'var a:int, b:int;'
 (defconst jsx--variable-definition-re
   (concat
@@ -259,6 +268,9 @@
     (,jsx--constant-variable-re 0 font-lock-constant-face)
     (,jsx--builtin-function-re 1 font-lock-builtin-face)
     (,jsx--regex-literal-re 1 font-lock-string-face)
+    (,jsx--variable-definition-with-class-re
+     (1 font-lock-variable-name-face)
+     (2 font-lock-type-face))
     (,jsx--variable-definition-re 1 font-lock-variable-name-face)
     (,jsx--primitive-type-re 0 font-lock-type-face)
     (,jsx--reserved-class-re 1 font-lock-type-face)
