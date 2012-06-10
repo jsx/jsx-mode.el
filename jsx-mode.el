@@ -208,7 +208,7 @@
 (defconst jsx--regex-literal-re
   (concat
    "\\(?:^\\|[(,;:]\\)\\s-*"
-   "\\(/[^/\\]*\\(?:\\\\.[^/\\]*\\)*/[gim]*\\)"))
+   "\\(/[^/\\\n]*\\(?:\\\\.[^/\\\n]*\\)*/[gim]*\\)"))
 
 (defconst jsx--builtin-function-re
   (concat
