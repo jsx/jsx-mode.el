@@ -262,8 +262,6 @@
     (,jsx--class-definition-re 2 font-lock-type-face)
     (,jsx--create-instance-re 1 font-lock-type-face)
     (,jsx--template-class-re  1 font-lock-type-face)
-    (,jsx--function-definition-re 1 font-lock-function-name-face)
-    (,jsx--function-definition-in-map-re 1 font-lock-function-name-face)
 
     ;; color names of interface or mixin like implements A, B, C
     ,(list
@@ -359,6 +357,12 @@
                (end-of-line))
             nil
             '(1 font-lock-type-face)))
+
+    ;; function names should be colored after coloring arguments,
+    ;; otherwise arguments will be colored
+    ;; e.g. function(b : string, a : function() : void)
+    (,jsx--function-definition-re 1 font-lock-function-name-face)
+    (,jsx--function-definition-in-map-re 1 font-lock-function-name-face)
     ))
 
 
