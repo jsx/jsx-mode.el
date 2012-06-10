@@ -79,6 +79,8 @@
     (modify-syntax-entry ?/  ". 124b" st)
     (modify-syntax-entry ?*  ". 23"   st)
     (modify-syntax-entry ?\n "> b"  st)
+    ;; string
+    (modify-syntax-entry ?\' "\"" st)
     st))
 
 
