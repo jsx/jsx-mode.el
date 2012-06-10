@@ -75,6 +75,8 @@
 
 (defvar jsx-mode-syntax-table
   (let ((st (make-syntax-table)))
+    (modify-syntax-entry ?_  "w" st)
+    ;; C-style comments
     ;; cf. Syntax Tables > Syntax Descriptors > Syntax Flags
     (modify-syntax-entry ?/  ". 124b" st)
     (modify-syntax-entry ?*  ". 23"   st)
@@ -183,19 +185,12 @@
    "\\(?:^\\|,\\)\\s-*\\(" jsx--identifier-re "\\)\\s-*:\\s-*function\\s-*("))
 
 (defconst jsx--keywords-re
-  ;; not match __noconvert__ if specify 'words to the 2nd argument of regex-opt
-  (concat
-   "\\_<"
-   (regexp-opt
-    (append jsx--keywords jsx--reserved-words jsx--contextual-keywords))
-   "\\_>"))
+  (regexp-opt
+   (append jsx--keywords jsx--reserved-words jsx--contextual-keywords)
+   'words))
 
 (defconst jsx--constant-variable-re
-  ;; not match __FILE__ if specify 'words to the 2nd argument of regex-opt
-  (concat
-   "\\_<"
-  (regexp-opt jsx--constant-variables)
-  "\\_>"))
+  (regexp-opt jsx--constant-variables 'words))
 
 (defconst jsx--primitive-type-re
   (regexp-opt
