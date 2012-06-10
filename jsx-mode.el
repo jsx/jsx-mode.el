@@ -46,7 +46,7 @@
 
 (require 'thingatpt)
 
-(defconst jsx-version "0.0.2"
+(defconst jsx-version "0.0.3"
   "Version of `jsx-mode'")
 
 (defgroup jsx nil
