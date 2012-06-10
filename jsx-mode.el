@@ -39,6 +39,8 @@
 ;;        })();
 ;; * support flymake
 ;; * support imenu
+;; * fix a bug that any token after implements is colored
+;;   e.g. 'J' will be colored in the code like 'class C implements I { J'
 
 ;;; Code:
 
@@ -75,10 +77,14 @@
 
 (defvar jsx-mode-syntax-table
   (let ((st (make-syntax-table)))
+    (modify-syntax-entry ?_  "w" st)
+    ;; C-style comments
     ;; cf. Syntax Tables > Syntax Descriptors > Syntax Flags
     (modify-syntax-entry ?/  ". 124b" st)
     (modify-syntax-entry ?*  ". 23"   st)
     (modify-syntax-entry ?\n "> b"  st)
+    ;; string
+    (modify-syntax-entry ?\' "\"" st)
     st))
 
 
@@ -181,19 +187,12 @@
    "\\(?:^\\|,\\)\\s-*\\(" jsx--identifier-re "\\)\\s-*:\\s-*function\\s-*("))
 
 (defconst jsx--keywords-re
-  ;; not match __noconvert__ if specify 'words to the 2nd argument of regex-opt
-  (concat
-   "\\_<"
-   (regexp-opt
-    (append jsx--keywords jsx--reserved-words jsx--contextual-keywords))
-   "\\_>"))
+  (regexp-opt
+   (append jsx--keywords jsx--reserved-words jsx--contextual-keywords)
+   'words))
 
 (defconst jsx--constant-variable-re
-  ;; not match __FILE__ if specify 'words to the 2nd argument of regex-opt
-  (concat
-   "\\_<"
-  (regexp-opt jsx--constant-variables)
-  "\\_>"))
+  (regexp-opt jsx--constant-variables 'words))
 
 (defconst jsx--primitive-type-re
   (regexp-opt
@@ -230,8 +229,22 @@
        "\\(?:" jsx--identifier-re "\\.\\)?"
        "\\(" jsx--identifier-re "\\)"))
 
+;; class name of the return value like function createFoo() : Foo {
+(defconst jsx--return-class-re
+  (concat
+   ")\\s-*:\\s-*"
+   "\\(?:" jsx--identifier-re "\\.\\)?"
+   "\\(" jsx--identifier-re "\\)\\s-*\\(?:[,{]\\|$\\)"))
+
 (defconst jsx--template-class-re
   (concat "<\\s-*\\(" jsx--identifier-re "\\)\\s-*>"))
+
+(defconst jsx--variable-definition-with-class-re
+  (concat
+   "\\<\\var\\s-+\\(" jsx--identifier-re "\\)"
+   "\\s-*:\\s-*"
+   "\\(?:" jsx--identifier-re "\\.\\)?"
+   "\\(" jsx--identifier-re "\\)""\\>"))
 
 ;; currently not support definitions like 'var a:int, b:int;'
 (defconst jsx--variable-definition-re
@@ -253,8 +266,11 @@
 (defvar jsx-font-lock-keywords
   `(
     (,jsx--constant-variable-re 0 font-lock-constant-face)
-    (,jsx--builtin-function-re 0 font-lock-builtin-face)
+    (,jsx--builtin-function-re 1 font-lock-builtin-face)
     (,jsx--regex-literal-re 1 font-lock-string-face)
+    (,jsx--variable-definition-with-class-re
+     (1 font-lock-variable-name-face)
+     (2 font-lock-type-face))
     (,jsx--variable-definition-re 1 font-lock-variable-name-face)
     (,jsx--primitive-type-re 0 font-lock-type-face)
     (,jsx--reserved-class-re 1 font-lock-type-face)
@@ -262,8 +278,7 @@
     (,jsx--class-definition-re 2 font-lock-type-face)
     (,jsx--create-instance-re 1 font-lock-type-face)
     (,jsx--template-class-re  1 font-lock-type-face)
-    (,jsx--function-definition-re 1 font-lock-function-name-face)
-    (,jsx--function-definition-in-map-re 1 font-lock-function-name-face)
+    (,jsx--return-class-re 1 font-lock-type-face)
 
     ;; color names of interface or mixin like implements A, B, C
     ,(list
@@ -272,9 +287,6 @@
             '(forward-symbol -1)
             nil
             '(1 font-lock-type-face)))
-
-    ;; color class name of the return value like function createFoo() : Foo {
-    (,(concat ")\\s-*:\\s-*\\(" jsx--identifier-re "\\)") 1 font-lock-type-face)
 
     ;; color class names like below (color 'B', 'I', and 'J')
     ;;     class A
@@ -359,6 +371,12 @@
                (end-of-line))
             nil
             '(1 font-lock-type-face)))
+
+    ;; function names should be colored after coloring arguments,
+    ;; otherwise arguments will be colored
+    ;; e.g. function(b : string, a : function() : void)
+    (,jsx--function-definition-re 1 font-lock-function-name-face)
+    (,jsx--function-definition-in-map-re 1 font-lock-function-name-face)
     ))
 
 
