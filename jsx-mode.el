@@ -253,7 +253,7 @@
 (defvar jsx-font-lock-keywords
   `(
     (,jsx--constant-variable-re 0 font-lock-constant-face)
-    (,jsx--builtin-function-re 0 font-lock-builtin-face)
+    (,jsx--builtin-function-re 1 font-lock-builtin-face)
     (,jsx--regex-literal-re 1 font-lock-string-face)
     (,jsx--variable-definition-re 1 font-lock-variable-name-face)
     (,jsx--primitive-type-re 0 font-lock-type-face)
