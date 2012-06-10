@@ -227,6 +227,13 @@
        "\\(?:" jsx--identifier-re "\\.\\)?"
        "\\(" jsx--identifier-re "\\)"))
 
+;; class name of the return value like function createFoo() : Foo {
+(defconst jsx--return-class-re
+  (concat
+   ")\\s-*:\\s-*"
+   "\\(?:" jsx--identifier-re "\\.\\)?"
+   "\\(" jsx--identifier-re "\\)\\s-*\\(?:[,{]\\|$\\)"))
+
 (defconst jsx--template-class-re
   (concat "<\\s-*\\(" jsx--identifier-re "\\)\\s-*>"))
 
@@ -259,6 +266,7 @@
     (,jsx--class-definition-re 2 font-lock-type-face)
     (,jsx--create-instance-re 1 font-lock-type-face)
     (,jsx--template-class-re  1 font-lock-type-face)
+    (,jsx--return-class-re 1 font-lock-type-face)
 
     ;; color names of interface or mixin like implements A, B, C
     ,(list
@@ -267,9 +275,6 @@
             '(forward-symbol -1)
             nil
             '(1 font-lock-type-face)))
-
-    ;; color class name of the return value like function createFoo() : Foo {
-    (,(concat ")\\s-*:\\s-*\\(" jsx--identifier-re "\\)") 1 font-lock-type-face)
 
     ;; color class names like below (color 'B', 'I', and 'J')
     ;;     class A
