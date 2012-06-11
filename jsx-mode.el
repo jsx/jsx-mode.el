@@ -63,6 +63,15 @@
   :type 'string
   :group 'jsx-mode)
 
+(defcustom jsx-cmd-options '()
+  "jsx command options for `jsx-mode'.
+
+For example, if this value is '(\"--add-search-path\" \"/path/to/lib\"),
+then execute command like \"jsx --add-search-path /path/to/lib --run sample.jsx\".
+"
+  :type '(repeat string)
+  :group 'jsx-mode)
+
 (defcustom jsx-node-cmd "node"
   "node command for `jsx-mode'"
   :type 'string
@@ -72,7 +81,8 @@
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "C-c C-c") 'comment-region)
     (define-key map (kbd "C-c c") 'jsx-compile-file)
-    (define-key map (kbd "C-c C-r") 'jsx-compile-file-and-run)
+    (define-key map (kbd "C-c C") 'jsx-compile-file-async)
+    (define-key map (kbd "C-c C-r") 'jsx-run-buffer)
     map))
 
 (defvar jsx-mode-syntax-table
@@ -416,7 +426,7 @@
        (t (* jsx-indent-level depth))
        ))))
 
-(defun jsx-compile-file (&optional options dst)
+(defun jsx-compile-file (&optional options dst async)
   "Compile the JSX script of the current buffer
 and make a JS script in the same directory."
   (interactive)
@@ -425,24 +435,42 @@ and make a JS script in the same directory."
   ;; FIXME: file-name-nondirectory needs temporarily
   (let* ((jsx-file (file-name-nondirectory (buffer-file-name)))
          (js-file (or dst (substring jsx-file 0 -1)))
-         cmd)
+         (cmd jsx-cmd))
+    (setq options (append jsx-cmd-options options))
     (if options
-        (setq cmd (format "%s %s --output %s %s" jsx-cmd options js-file jsx-file))
-      (setq cmd (format "%s --output %s %s" jsx-cmd js-file jsx-file)))
-    (message "Compiling...")
-    (message cmd)
+        (setq cmd (format "%s %s" cmd (mapconcat 'identity options " "))))
+    (setq cmd (format "%s --output %s %s" cmd js-file jsx-file))
+    (if async
+        (setq cmd (concat cmd " &")))
+    (message "Compiling...: %s" cmd)
     (if (eq (shell-command cmd) 0) js-file nil)))
 
+(defun jsx-compile-file-async (&optional options dst)
+  "Compile the JSX scirpt of the current buffer asynchronously
+and make a JS script in the same directory."
+  (interactive)
+  (jsx-compile-file options dst t))
 
-;; TODO: if JS file already exits, run the script even though the compilcation failed
 (defun jsx-compile-file-and-run ()
   "Compile the JSX script of the current buffer,
 make a JS script in the same directory, and run it."
   (interactive)
-  (let* ((js-file (jsx-compile-file "--executable"))
+  (let* ((js-file (jsx-compile-file '("--executable")))
          (cmd (format "%s %s" jsx-node-cmd js-file)))
     (if js-file
         (shell-command cmd))))
+
+(defun jsx-run-buffer (&optional options)
+  "Run the JSX script of the current buffer."
+  (interactive)
+  (save-buffer)
+  (let ((jsx-file (file-name-nondirectory (buffer-file-name)))
+        (cmd jsx-cmd))
+    (setq options (append jsx-cmd-options options))
+    (if options
+        (setq cmd (format "%s %s" cmd (mapconcat 'identity options " "))))
+    (setq cmd (format "%s --run %s" cmd jsx-file))
+    (shell-command cmd)))
 
 
 (define-derived-mode jsx-mode fundamental-mode "Jsx"
