@@ -63,6 +63,15 @@
   :type 'string
   :group 'jsx-mode)
 
+(defcustom jsx-cmd-options '()
+  "jsx command options for `jsx-mode'.
+
+For example, if this value is '(\"--add-search-path\" \"/path/to/lib\"),
+then execute command like \"jsx --add-search-path /path/to/lib --run sample.jsx\".
+"
+  :type '(repeat string)
+  :group 'jsx-mode)
+
 (defcustom jsx-node-cmd "node"
   "node command for `jsx-mode'"
   :type 'string
@@ -425,21 +434,20 @@ and make a JS script in the same directory."
   ;; FIXME: file-name-nondirectory needs temporarily
   (let* ((jsx-file (file-name-nondirectory (buffer-file-name)))
          (js-file (or dst (substring jsx-file 0 -1)))
-         cmd)
+         (cmd jsx-cmd))
+    (setq options (append jsx-cmd-options options))
     (if options
-        (setq cmd (format "%s %s --output %s %s" jsx-cmd options js-file jsx-file))
-      (setq cmd (format "%s --output %s %s" jsx-cmd js-file jsx-file)))
-    (message "Compiling...")
-    (message cmd)
+        (setq cmd (format "%s %s" cmd (mapconcat 'identity options " "))))
+    (setq cmd (format "%s --output %s %s" cmd js-file jsx-file))
+    (message "Compiling...: %s" cmd)
     (if (eq (shell-command cmd) 0) js-file nil)))
 
 
-;; TODO: if JS file already exits, run the script even though the compilcation failed
 (defun jsx-compile-file-and-run ()
   "Compile the JSX script of the current buffer,
 make a JS script in the same directory, and run it."
   (interactive)
-  (let* ((js-file (jsx-compile-file "--executable"))
+  (let* ((js-file (jsx-compile-file '("--executable")))
          (cmd (format "%s %s" jsx-node-cmd js-file)))
     (if js-file
         (shell-command cmd))))
