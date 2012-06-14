@@ -37,7 +37,6 @@
 ;;    (function() : void {
 ;;            log "";
 ;;        })();
-;; * support flymake
 ;; * support imenu
 ;; * fix a bug that any token after implements is colored
 ;;   e.g. 'J' will be colored in the code like 'class C implements I { J'
@@ -75,6 +74,18 @@ then execute command like \"jsx --add-search-path /path/to/lib --run sample.jsx\
 (defcustom jsx-node-cmd "node"
   "node command for `jsx-mode'"
   :type 'string
+  :group 'jsx-mode)
+
+(defcustom jsx-syntax-check-mode "parse"
+  "Jsx compilation mode for the syntax check in `jsx-mode'.
+The value should be \"parse\" or \"compile\". (Default: \"parse\")"
+  :type '(choice (const "parse")
+                 (const "compile"))
+  :group 'jsx-mode)
+
+(defcustom jsx-use-flymake nil
+  "Whether or not to use `flymake-mode' in `jsx-mode'."
+  :type 'boolean
   :group 'jsx-mode)
 
 (defvar jsx-mode-map
@@ -426,6 +437,9 @@ then execute command like \"jsx --add-search-path /path/to/lib --run sample.jsx\
        (t (* jsx-indent-level depth))
        ))))
 
+
+;; compile or run the buffer
+
 (defun jsx-compile-file (&optional options dst async)
   "Compile the JSX script of the current buffer
 and make a JS script in the same directory."
@@ -473,12 +487,72 @@ make a JS script in the same directory, and run it."
     (shell-command cmd)))
 
 
+;; flymake
+
+(defvar jsx-err-line-patterns
+  '(("\\[\\(.*\\):\\([0-9]+\\)\\] \\(.*\\)" 1 2 nil 3)))
+
+(defun jsx-flymake-on ()
+  "Turn on `flymake-mode' in `jsx-mode'"
+  (interactive)
+  (set (make-local-variable 'flymake-err-line-patterns) jsx-err-line-patterns)
+  (add-to-list 'flymake-allowed-file-name-masks '("\\.jsx\\'" jsx-flymake-init))
+  (flymake-mode t))
+
+(defun jsx-flymake-off ()
+  "Turn off `flymake-mode' in `jsx-mode'"
+  (interactive)
+  (flymake-mode 0))
+
+(defun jsx-flymake-init ()
+  (let* ((temp-file (flymake-init-create-temp-buffer-copy
+                     ;; if use import "*.jsx", _flymake.jsx is very annoying,
+                     ;; so not use 'flymake-create-temp-inplace
+                     (lambda (file-name prefix)
+                       (concat
+                        (flymake-create-temp-inplace file-name prefix) ".tmp"))))
+         (local-file (file-relative-name
+                      temp-file
+                      (file-name-directory buffer-file-name))))
+    (list jsx-cmd (append jsx-cmd-options
+                          (list "--mode" jsx-syntax-check-mode local-file)))))
+
+(defun jsx--get-errs-for-current-line ()
+  "Return the list of errors/warnings for the current line"
+  (let* ((line-no             (flymake-current-line-no))
+         (line-err-info-list  (nth 0 (flymake-find-err-info flymake-err-info line-no)))
+         (msgs '()))
+    (dolist (err-info line-err-info-list)
+      (let* ((text (flymake-ler-text err-info))
+             (line (flymake-ler-line err-info)))
+        (setq msgs (append msgs (list (format "[%s] %s" line text))))))
+    msgs))
+
+(defun jsx-display-err-for-current-line ()
+  "Display the errors/warnings for the current line in the echo area
+if there are any errors or warnings in `jsx-mode'."
+  (interactive)
+  (let ((msgs (jsx--get-errs-for-current-line)))
+    (message (mapconcat 'identity msgs "\n"))))
+
+(defun jsx-display-popup-err-for-current-line ()
+  "Display a popup window with errors/warnings for the current line
+if there are any errors or warnings in `jsx-mode'."
+  (interactive)
+  (let ((msgs (jsx--get-errs-for-current-line)))
+    (if (require 'popup nil t)
+        (popup-tip (mapconcat 'identity msgs "\n"))
+      (message "`popup' is not instelled."))))
+
+
 (define-derived-mode jsx-mode fundamental-mode "Jsx"
   :syntax-table jsx-mode-syntax-table
   (set (make-local-variable 'font-lock-defaults)
        '(jsx-font-lock-keywords nil nil))
   (set (make-local-variable 'indent-line-function) 'jsx-indent-line)
   (set (make-local-variable 'comment-start) "// ")
-  (set (make-local-variable 'comment-end) ""))
+  (set (make-local-variable 'comment-end) "")
+  (if (and jsx-use-flymake (require 'flymake nil t))
+      (jsx-flymake-on)))
 
 (provide 'jsx-mode)
