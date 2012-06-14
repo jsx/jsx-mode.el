@@ -37,7 +37,6 @@
 ;;    (function() : void {
 ;;            log "";
 ;;        })();
-;; * support flymake
 ;; * support imenu
 ;; * fix a bug that any token after implements is colored
 ;;   e.g. 'J' will be colored in the code like 'class C implements I { J'
@@ -85,7 +84,7 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
   :group 'jsx-mode)
 
 (defcustom jsx-use-flymake nil
-  "Whether or not to use flymake in `jsx-mode'."
+  "Whether or not to use `flymake-mode' in `jsx-mode'."
   :type 'boolean
   :group 'jsx-mode)
 
@@ -490,20 +489,22 @@ make a JS script in the same directory, and run it."
 
 ;; flymake
 
-(defvar flymake-jsx-err-line-patterns
+(defvar jsx-err-line-patterns
   '(("\\[\\(.*\\):\\([0-9]+\\)\\] \\(.*\\)" 1 2 nil 3)))
 
 (defun jsx-flymake-on ()
+  "Turn on `flymake-mode' in `jsx-mode'"
   (interactive)
-  (set (make-local-variable 'flymake-err-line-patterns) flymake-jsx-err-line-patterns)
-  (add-to-list 'flymake-allowed-file-name-masks '("\\.jsx\\'" flymake-jsx-init))
+  (set (make-local-variable 'flymake-err-line-patterns) jsx-err-line-patterns)
+  (add-to-list 'flymake-allowed-file-name-masks '("\\.jsx\\'" jsx-flymake-init))
   (flymake-mode t))
 
 (defun jsx-flymake-off ()
+  "Turn off `flymake-mode' in `jsx-mode'"
   (interactive)
   (flymake-mode 0))
 
-(defun flymake-jsx-init ()
+(defun jsx-flymake-init ()
   (let* ((temp-file (flymake-init-create-temp-buffer-copy
                      ;; if use import "*.jsx", _flymake.jsx is very annoying,
                      ;; so not use 'flymake-create-temp-inplace
