@@ -516,6 +516,32 @@ make a JS script in the same directory, and run it."
     (list jsx-cmd (append jsx-cmd-options
                           (list "--mode" jsx-syntax-check-mode local-file)))))
 
+(defun jsx--get-errs-for-current-line ()
+  "Return the list of errors/warnings for the current line"
+  (let* ((line-no             (flymake-current-line-no))
+         (line-err-info-list  (nth 0 (flymake-find-err-info flymake-err-info line-no)))
+         (msgs '()))
+    (dolist (err-info line-err-info-list)
+      (let* ((text (flymake-ler-text err-info))
+             (line (flymake-ler-line err-info)))
+        (setq msgs (append msgs (list (format "[%s] %s" line text))))))
+    msgs))
+
+(defun jsx-display-err-for-current-line ()
+  "Display the errors/warnings for the current line in the echo area
+if there are any errors or warnings in `jsx-mode'."
+  (interactive)
+  (let ((msgs (jsx--get-errs-for-current-line)))
+    (message (mapconcat 'identity msgs "\n"))))
+
+(defun jsx-display-popup-err-for-current-line ()
+  "Display a popup window with errors/warnings for the current line
+if there are any errors or warnings in `jsx-mode'."
+  (interactive)
+  (let ((msgs (jsx--get-errs-for-current-line)))
+    (if (require 'popup nil t)
+        (popup-tip (mapconcat 'identity msgs "\n"))
+      (message "`popup' is not instelled."))))
 
 
 (define-derived-mode jsx-mode fundamental-mode "Jsx"
