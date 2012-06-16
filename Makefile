@@ -6,7 +6,10 @@ clean:
 	@rm -f $(TARGET).elc $(TARGET).el~
 
 test:
-	@emacs --script test/font-face-test.el
+	@echo === font-face-test.el ===
+	-@emacs --script test/font-face-test.el
+	@echo === indent-test.el ===
+	-@emacs --script test/indent-test.el
 
 .el.elc:
 	@emacs -batch -f batch-byte-compile $<
