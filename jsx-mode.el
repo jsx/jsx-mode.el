@@ -33,10 +33,6 @@
 
 
 ;; TODO:
-;; * anonymouse function calls is not indented correctly like below
-;;    (function() : void {
-;;            log "";
-;;        })();
 ;; * support imenu
 ;; * fix a bug that any token after implements is colored
 ;;   e.g. 'J' will be colored in the code like 'class C implements I { J'
@@ -277,7 +273,7 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
 (defun jsx--in-arg-definition-p ()
   (when (list-at-point)
     (save-excursion
-      (search-backward "(")
+      (search-backward "(" nil t)
       (forward-symbol -1)
       (or (equal (word-at-point) "function")
           (progn (forward-symbol -1)
@@ -404,12 +400,41 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
 (defun jsx--in-string-or-comment-p (&optional pos)
   (nth 8 (syntax-ppss pos)))
 
+(defun jsx--in-comment-p (&optional pos)
+  (nth 4 (syntax-ppss pos)))
 
-(defun jsx--calculate-depth (&optional pos)
+(defun jsx--non-block-statement-p ()
   (save-excursion
-    (let ((depth (nth 0 (syntax-ppss pos))))
-      ;; TODO
-      depth)))
+    (jsx--go-to-previous-non-comment-char)
+    (or (string-match-p "\\(?:do\\|else\\)\\_>" (or (word-at-point) ""))
+        (and (= (char-after) ?\))
+             (progn
+               (forward-char)
+               (backward-list)
+               (backward-word)
+               (looking-at "\\(?:for\\|if\\|while\\)\\_>"))))))
+
+(defun jsx--go-to-previous-non-comment-char ()
+  (search-backward-regexp "[[:graph:]]" nil t)
+  (while (jsx--in-comment-p)
+    ;; move to the beggining of the comment
+    (search-backward-regexp "/\\*\\|//" nil t)
+    ;; move to the previous visible character
+    (search-backward-regexp "[[:graph:]]" nil t)))
+
+(defun jsx--go-to-next-non-comment-char ()
+  (if (looking-at "[[:graph:]]")
+      (forward-char))
+  (search-forward-regexp "[[:graph:]]" nil t)
+  (while (save-excursion (forward-char) (jsx--in-comment-p))
+    ;; move to the end of the comment
+    (search-forward-regexp "\\*/\\|$" nil t)
+    ;; move to the next visible character
+    (search-forward-regexp "[[:graph:]]" nil t)))
+
+(defun jsx--up-list (&optional arg)
+  "Return t if succeeded otherwise nil"
+  (ignore-errors (up-list arg) t))
 
 (defun jsx-indent-line ()
   (interactive)
@@ -419,23 +444,50 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
       (indent-line-to indent-length)
       (if (> offset 0) (forward-char offset)))))
 
-(defun jsx-calculate-indentation (&optional pos)
+(defun jsx-calculate-indentation ()
   (save-excursion
-    (if pos
-        (goto-char pos)
-      (back-to-indentation))
-    (let* ((cw (current-word))
-           (ca (char-after))
-           (depth (jsx--calculate-depth)))
-      (if (or (eq ca ?})
-              (eq ca ?\))
-              (equal cw "case")
-              (equal cw "default"))
-          (setq depth (1- depth)))
-      (cond
-       ((jsx--in-string-or-comment-p) nil)
-       (t (* jsx-indent-level depth))
-       ))))
+    (back-to-indentation)
+    (if (jsx--in-string-or-comment-p)
+        nil
+      (let* ((cw (current-word))
+             (ca (char-after)))
+        (cond
+         ((or (eq ca ?{)
+              (eq ca ?\())
+          (progn (jsx--go-to-previous-non-comment-char) (current-indentation)))
+         ((and
+           (or (eq ca ?})
+               (eq ca ?\))
+               (equal cw "case")
+               (equal cw "default"))
+           (jsx--up-list -1))
+          (back-to-indentation)
+          (while (jsx--in-arg-definition-p)
+            (jsx--up-list -1)
+            (back-to-indentation))
+          (current-indentation))
+         ((jsx--non-block-statement-p)
+          (+ (progn
+               (jsx--go-to-previous-non-comment-char)
+               (current-indentation))
+             jsx-indent-level))
+         ((jsx--in-arg-definition-p)
+          (progn
+            (jsx--go-to-previous-non-comment-char)
+            (if (= (char-after) ?\()
+                (+ (current-indentation) jsx-indent-level)
+              (jsx--up-list -1)
+              (jsx--go-to-next-non-comment-char)
+              (backward-char)
+              (current-column))))
+         ((jsx--up-list -1)
+          (back-to-indentation)
+          (while (jsx--in-arg-definition-p)
+            (jsx--up-list -1)
+            (back-to-indentation))
+          (+ (current-column) jsx-indent-level))
+         (t 0)
+         )))))
 
 
 ;; compile or run the buffer

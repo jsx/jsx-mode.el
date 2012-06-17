@@ -22,29 +22,26 @@
 ;; OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 ;; THE SOFTWARE.
 
+;;; Commentary:
+
+;; This file is currently for my private use.
+
 ;;; Code:
 
-(require 'cl)
-
-(cd (file-name-directory load-file-name))
-(load-file "../jsx-mode.el")
-(add-to-list 'auto-mode-alist '("\\.jsx\\'" . jsx-mode))
-
-(defvar jsx-dir "jsx/font-face")
-
-(defun get-test-suite ()
+(defun font-face-test-get-test-suite ()
   (when (string-match "^/\\*\\(?:.\\|\n\\)*\\*/" (buffer-string))
     (let ((beg (match-beginning 0))
           (end (match-end 0))
-          test-suite token)
+          expecteds actuals token)
       (while (search-forward-regexp
               "\\([^ \t\n:][^\n:]*\\)\\s-*:\\s-*\\([-a-z]+\\)" end t)
         (setq token (match-string 1))
         (put-text-property 0 (length token) 'face (intern (match-string 2)) token)
-        (setq test-suite (append test-suite (list token))))
+        (push-end token expecteds))
       (goto-char end)
-      (end-of-line)
-      test-suite)))
+      (while (setq token (next-token))
+        (push-end token actuals))
+      (cons expecteds actuals))))
 
 (defun next-token ()
   (let ((buf (current-buffer)))
@@ -59,51 +56,37 @@
        "[ \t\r\n]+$" ""
        (buffer-substring (point) (next-property-change (point) buf))))))
 
-(defun run-test ()
-  (let* ((cnt 0)
-        (failed-cnt 0)
-        (msg "")
-        (start-time (current-time-string))
-        (files (directory-files jsx-dir nil "\\.jsx\\'"))
-        (total-cnt (length files)))
-    (setq font-lock-verbose nil)
-    (dolist (file files)
-      (setq cnt (1+ cnt))
-      (with-current-buffer (find-file-noselect (concat jsx-dir "/" file))
-        (font-lock-default-fontify-buffer)
-        (goto-char (point-min))
-        (let ((test-suite (get-test-suite))
-              (errors '())
-              expected)
-          (while (setq token (next-token))
-            (setq expected (or (pop test-suite) ""))
-            (condition-case ex
-                (assert (and (equal expected token) (equal-face expected token)))
-              (error
-               (setq errors (append errors (list (make-error-msg expected token)))))))
-          (when (> (length errors) 0)
-            (setq msg (format "%sF %s:\n%s\n\n" msg file (mapconcat 'identity errors "\n\n")))
-            (setq failed-cnt (1+ failed-cnt))))))
-    (message
-     (concat
-      "Passed: " (format "%d\n" (- cnt failed-cnt))
-      "Failed: " (format "%d\n" failed-cnt)
-      "Total: " (format "%d/%d\n" cnt total-cnt)
-      "\n"
-      "Started at:  " start-time "\n"
-      "Finished at: " (current-time-string) "\n"
-      "\n"
-      msg))))
-
 (defun equal-face (a b)
   (eq (get-text-property 0 'face a) (get-text-property 0 'face b)))
 
-(defun make-error-msg (expected actual)
-  (format
-   "\texpected: %s (%s)\n\tactual: %s (%s)"
-   (substring-no-properties expected)
-   (get-text-property 0 'face expected)
-   (substring-no-properties actual)
-   (get-text-property 0 'face actual)))
+(defun compare-token (expected actual)
+  (and (equal expected actual) (equal-face expected actual)))
 
-(run-test)
+(defun font-face-test-pre-func ()
+  (custom-set-variables '(font-lock-verbose nil))
+  (font-lock-default-fontify-buffer)
+  (goto-char (point-min)))
+
+(defun make-error-msgs (expected actual)
+  (cons
+   (format "%s (%s)"
+           (and expected (substring-no-properties expected))
+           (and expected (get-text-property 0 'face expected)))
+   (format "%s (%s)"
+           (and actual (substring-no-properties actual))
+           (and actual (get-text-property 0 'face actual)))))
+
+
+(setq vc-handled-backends nil)
+(cd (file-name-directory load-file-name))
+(load (expand-file-name "./lib/test-util.el") nil t t)
+(load (expand-file-name "../jsx-mode.el") nil t t)
+(add-to-list 'auto-mode-alist '("\\.jsx\\'" . jsx-mode))
+
+(if (run-test "jsx/font-face" "jsx"
+              :pre-func 'font-face-test-pre-func
+              :get-test-suite-func 'font-face-test-get-test-suite
+              :make-msg-func 'make-error-msgs
+              :compare-func 'compare-token)
+    (kill-emacs)
+  (kill-emacs 1))
