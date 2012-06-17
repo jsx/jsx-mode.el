@@ -60,7 +60,7 @@
 (load (expand-file-name "./lib/test-util.el") nil t t)
 (load (expand-file-name "../jsx-mode.el") nil t t)
 (add-to-list 'auto-mode-alist '("\\.jsx\\'" . jsx-mode))
-(setq calculate-indent-func 'jsx-calculate-indentation)
+(setq calculate-indent-func 'jsx--calculate-indentation)
 
 (if (run-test "jsx/indent" "jsx"
               :pre-func 'indent-test-pre-func

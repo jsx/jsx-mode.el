@@ -25,23 +25,49 @@
 
 ;;; Commentary:
 
+;; =============
+;;  Get Started
+;; =============
+
 ;; Put this file in your Emacs lisp path (e.g. ~/.emacs.d/site-lisp)
-;; and add to the following lines to your .emacs:
+;; and add to the following lines to your ~/.emacs.d/init.el.
 
 ;;    (add-to-list 'auto-mode-alist '("\\.jsx\\'" . jsx-mode))
 ;;    (autoload 'jsx-mode "jsx-mode" "JSX mode" t)
+
+;; See also init.el.example.
+
+
+;; ==============
+;;  Key Bindings
+;; ==============
+
+;; In `jsx-mode', the following keys are bound by default.
+
+;; C-c C-c     comment-region (Comment or uncomment each line in the region)
+;; C-c c       jsx-compile-file (Compile the current buffer)
+;; C-c C       jsx-compile-file-async (Compile the current buffer asynchronously)
+;; C-c C-r     jsx-run-buffer (Run the current buffer)
 
 
 ;; TODO:
 ;; * support imenu
 ;; * fix a bug that any token after implements is colored
 ;;   e.g. 'J' will be colored in the code like 'class C implements I { J'
+;; * support indentations for lambda statment
+;; * support auto-complete
 
 ;;; Code:
 
-(require 'thingatpt)
+(eval-and-compile
+  (require 'thingatpt)
+  (require 'flymake))
 
-(defconst jsx-version "0.0.3"
+(eval-when-compile
+  (require 'popup nil t))
+
+
+(defconst jsx-version "0.1.0"
   "Version of `jsx-mode'")
 
 (defgroup jsx nil
@@ -268,6 +294,10 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
   (concat
    "\\<\\var\\s-+\\(" jsx--identifier-re "\\)\\>"))
 
+(defconst jsx--variable-and-type-re
+  (concat
+   "\\(" jsx--identifier-re "\\)\\s-*:\\s-*\\(" jsx--identifier-re "\\)"))
+
 
 
 (defun jsx--in-arg-definition-p ()
@@ -333,7 +363,7 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
     ,(list
       (concat
        "\\<function\\>\\(?:\\s-+" jsx--identifier-re "\\)?\\s-*(\\s-*")
-      (list (concat "\\(" jsx--identifier-re "\\)\\s-*:\\s-*\\(" jsx--identifier-re "\\)")
+      (list jsx--variable-and-type-re
             '(unless (jsx--in-arg-definition-p) (end-of-line))
             nil
             '(1 font-lock-variable-name-face)
@@ -360,8 +390,8 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
     ;;              :int)
     ,(list
       (concat
-       "^\\s-*,?\\s-*\\(" jsx--identifier-re "\\)\\s-*:\\s-*\\(" jsx--identifier-re "\\)")
-      (list (concat "\\(" jsx--identifier-re "\\)\\s-*:\\s-*\\(" jsx--identifier-re "\\)")
+       "^\\s-*,?\\s-*" jsx--variable-and-type-re)
+      (list jsx--variable-and-type-re
             '(if (save-excursion (backward-char)
                                  (jsx--in-arg-definition-p))
                  (forward-symbol -2)
@@ -438,13 +468,14 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
 
 (defun jsx-indent-line ()
   (interactive)
-  (let ((indent-length (jsx-calculate-indentation))
+  (let ((indent-length (jsx--calculate-indentation))
         (offset (- (current-column) (current-indentation))))
     (when indent-length
       (indent-line-to indent-length)
       (if (> offset 0) (forward-char offset)))))
 
-(defun jsx-calculate-indentation ()
+(defun jsx--calculate-indentation ()
+  ;; TODO: refactoring
   (save-excursion
     (back-to-indentation)
     (if (jsx--in-string-or-comment-p)
@@ -492,12 +523,23 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
 
 ;; compile or run the buffer
 
+(defun jsx--some-buffers-modified-p ()
+  (let ((bufs (buffer-list))
+        buf modified-p)
+    (while (and (not modified-p) bufs)
+      (setq buf (car bufs))
+      (when (string-match-p "\\.jsx\\'" (buffer-name buf))
+        (with-current-buffer buf
+          (setq modified-p (buffer-modified-p))))
+      (setq bufs (cdr bufs)))
+    modified-p))
+
 (defun jsx-compile-file (&optional options dst async)
   "Compile the JSX script of the current buffer
 and make a JS script in the same directory."
   (interactive)
-  ;; TODO: save another temporary file or popup dialog to ask whether or not to save
-  (save-buffer)
+  (if (jsx--some-buffers-modified-p)
+      (save-some-buffers nil t))
   ;; FIXME: file-name-nondirectory needs temporarily
   (let* ((jsx-file (file-name-nondirectory (buffer-file-name)))
          (js-file (or dst (substring jsx-file 0 -1)))
@@ -529,7 +571,8 @@ make a JS script in the same directory, and run it."
 (defun jsx-run-buffer (&optional options)
   "Run the JSX script of the current buffer."
   (interactive)
-  (save-buffer)
+  (if (jsx--some-buffers-modified-p)
+      (save-some-buffers nil t))
   (let ((jsx-file (file-name-nondirectory (buffer-file-name)))
         (cmd jsx-cmd))
     (setq options (append jsx-cmd-options options))
@@ -548,7 +591,7 @@ make a JS script in the same directory, and run it."
   "Turn on `flymake-mode' in `jsx-mode'"
   (interactive)
   (set (make-local-variable 'flymake-err-line-patterns) jsx-err-line-patterns)
-  (add-to-list 'flymake-allowed-file-name-masks '("\\.jsx\\'" jsx-flymake-init))
+  (add-to-list 'flymake-allowed-file-name-masks '("\\.jsx\\'" jsx--flymake-init))
   (flymake-mode t))
 
 (defun jsx-flymake-off ()
@@ -556,7 +599,7 @@ make a JS script in the same directory, and run it."
   (interactive)
   (flymake-mode 0))
 
-(defun jsx-flymake-init ()
+(defun jsx--flymake-init ()
   (let* ((temp-file (flymake-init-create-temp-buffer-copy
                      ;; if use import "*.jsx", _flymake.jsx is very annoying,
                      ;; so not use 'flymake-create-temp-inplace
@@ -604,7 +647,7 @@ if there are any errors or warnings in `jsx-mode'."
   (set (make-local-variable 'indent-line-function) 'jsx-indent-line)
   (set (make-local-variable 'comment-start) "// ")
   (set (make-local-variable 'comment-end) "")
-  (if (and jsx-use-flymake (require 'flymake nil t))
+  (if jsx-use-flymake
       (jsx-flymake-on)))
 
 (provide 'jsx-mode)
