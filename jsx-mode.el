@@ -294,6 +294,10 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
   (concat
    "\\<\\var\\s-+\\(" jsx--identifier-re "\\)\\>"))
 
+(defconst jsx--variable-and-type-re
+  (concat
+   "\\(" jsx--identifier-re "\\)\\s-*:\\s-*\\(" jsx--identifier-re "\\)"))
+
 
 
 (defun jsx--in-arg-definition-p ()
@@ -359,7 +363,7 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
     ,(list
       (concat
        "\\<function\\>\\(?:\\s-+" jsx--identifier-re "\\)?\\s-*(\\s-*")
-      (list (concat "\\(" jsx--identifier-re "\\)\\s-*:\\s-*\\(" jsx--identifier-re "\\)")
+      (list jsx--variable-and-type-re
             '(unless (jsx--in-arg-definition-p) (end-of-line))
             nil
             '(1 font-lock-variable-name-face)
@@ -386,8 +390,8 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
     ;;              :int)
     ,(list
       (concat
-       "^\\s-*,?\\s-*\\(" jsx--identifier-re "\\)\\s-*:\\s-*\\(" jsx--identifier-re "\\)")
-      (list (concat "\\(" jsx--identifier-re "\\)\\s-*:\\s-*\\(" jsx--identifier-re "\\)")
+       "^\\s-*,?\\s-*" jsx--variable-and-type-re)
+      (list jsx--variable-and-type-re
             '(if (save-excursion (backward-char)
                                  (jsx--in-arg-definition-p))
                  (forward-symbol -2)
