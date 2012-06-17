@@ -25,28 +25,49 @@
 
 ;;; Commentary:
 
+;; =============
+;;  Get Started
+;; =============
+
 ;; Put this file in your Emacs lisp path (e.g. ~/.emacs.d/site-lisp)
-;; and add to the following lines to your .emacs:
+;; and add to the following lines to your ~/.emacs.d/init.el.
 
 ;;    (add-to-list 'auto-mode-alist '("\\.jsx\\'" . jsx-mode))
 ;;    (autoload 'jsx-mode "jsx-mode" "JSX mode" t)
 
+;; See also init.el.example.
+
+
+;; ==============
+;;  Key Bindings
+;; ==============
+
+;; In `jsx-mode', the following keys are bound by default.
+
+;; C-c C-c     comment-region (Comment or uncomment each line in the region)
+;; C-c c       jsx-compile-file (Compile the current buffer)
+;; C-c C       jsx-compile-file-async (Compile the current buffer asynchronously)
+;; C-c C-r     jsx-run-buffer (Run the current buffer)
+
 
 ;; TODO:
-;; * anonymouse function calls is not indented correctly like below
-;;    (function() : void {
-;;            log "";
-;;        })();
-;; * support flymake
 ;; * support imenu
 ;; * fix a bug that any token after implements is colored
 ;;   e.g. 'J' will be colored in the code like 'class C implements I { J'
+;; * support indentations for lambda statment
+;; * support auto-complete
 
 ;;; Code:
 
-(require 'thingatpt)
+(eval-and-compile
+  (require 'thingatpt)
+  (require 'flymake))
 
-(defconst jsx-version "0.0.3"
+(eval-when-compile
+  (require 'popup nil t))
+
+
+(defconst jsx-version "0.1.0"
   "Version of `jsx-mode'")
 
 (defgroup jsx nil
@@ -63,16 +84,38 @@
   :type 'string
   :group 'jsx-mode)
 
+(defcustom jsx-cmd-options '()
+  "jsx command options for `jsx-mode'.
+
+For example, if this value is '(\"--add-search-path\" \"/path/to/lib\"),
+then execute command like \"jsx --add-search-path /path/to/lib --run sample.jsx\".
+"
+  :type '(repeat string)
+  :group 'jsx-mode)
+
 (defcustom jsx-node-cmd "node"
   "node command for `jsx-mode'"
   :type 'string
+  :group 'jsx-mode)
+
+(defcustom jsx-syntax-check-mode "parse"
+  "Jsx compilation mode for the syntax check in `jsx-mode'.
+The value should be \"parse\" or \"compile\". (Default: \"parse\")"
+  :type '(choice (const "parse")
+                 (const "compile"))
+  :group 'jsx-mode)
+
+(defcustom jsx-use-flymake nil
+  "Whether or not to use `flymake-mode' in `jsx-mode'."
+  :type 'boolean
   :group 'jsx-mode)
 
 (defvar jsx-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "C-c C-c") 'comment-region)
     (define-key map (kbd "C-c c") 'jsx-compile-file)
-    (define-key map (kbd "C-c C-r") 'jsx-compile-file-and-run)
+    (define-key map (kbd "C-c C") 'jsx-compile-file-async)
+    (define-key map (kbd "C-c C-r") 'jsx-run-buffer)
     map))
 
 (defvar jsx-mode-syntax-table
@@ -208,7 +251,7 @@
 (defconst jsx--regex-literal-re
   (concat
    "\\(?:^\\|[(,;:]\\)\\s-*"
-   "\\(/[^/\\]*\\(?:\\\\.[^/\\]*\\)*/[gim]*\\)"))
+   "\\(/[^/\\\n]*\\(?:\\\\.[^/\\\n]*\\)*/[gim]*\\)"))
 
 (defconst jsx--builtin-function-re
   (concat
@@ -251,12 +294,16 @@
   (concat
    "\\<\\var\\s-+\\(" jsx--identifier-re "\\)\\>"))
 
+(defconst jsx--variable-and-type-re
+  (concat
+   "\\(" jsx--identifier-re "\\)\\s-*:\\s-*\\(" jsx--identifier-re "\\)"))
+
 
 
 (defun jsx--in-arg-definition-p ()
   (when (list-at-point)
     (save-excursion
-      (search-backward "(")
+      (search-backward "(" nil t)
       (forward-symbol -1)
       (or (equal (word-at-point) "function")
           (progn (forward-symbol -1)
@@ -316,7 +363,7 @@
     ,(list
       (concat
        "\\<function\\>\\(?:\\s-+" jsx--identifier-re "\\)?\\s-*(\\s-*")
-      (list (concat "\\(" jsx--identifier-re "\\)\\s-*:\\s-*\\(" jsx--identifier-re "\\)")
+      (list jsx--variable-and-type-re
             '(unless (jsx--in-arg-definition-p) (end-of-line))
             nil
             '(1 font-lock-variable-name-face)
@@ -343,8 +390,8 @@
     ;;              :int)
     ,(list
       (concat
-       "^\\s-*,?\\s-*\\(" jsx--identifier-re "\\)\\s-*:\\s-*\\(" jsx--identifier-re "\\)")
-      (list (concat "\\(" jsx--identifier-re "\\)\\s-*:\\s-*\\(" jsx--identifier-re "\\)")
+       "^\\s-*,?\\s-*" jsx--variable-and-type-re)
+      (list jsx--variable-and-type-re
             '(if (save-excursion (backward-char)
                                  (jsx--in-arg-definition-p))
                  (forward-symbol -2)
@@ -383,66 +430,214 @@
 (defun jsx--in-string-or-comment-p (&optional pos)
   (nth 8 (syntax-ppss pos)))
 
+(defun jsx--in-comment-p (&optional pos)
+  (nth 4 (syntax-ppss pos)))
 
-(defun jsx--calculate-depth (&optional pos)
+(defun jsx--non-block-statement-p ()
   (save-excursion
-    (let ((depth (nth 0 (syntax-ppss pos))))
-      ;; TODO
-      depth)))
+    (jsx--go-to-previous-non-comment-char)
+    (or (string-match-p "\\(?:do\\|else\\)\\_>" (or (word-at-point) ""))
+        (and (= (char-after) ?\))
+             (progn
+               (forward-char)
+               (backward-list)
+               (backward-word)
+               (looking-at "\\(?:for\\|if\\|while\\)\\_>"))))))
+
+(defun jsx--go-to-previous-non-comment-char ()
+  (search-backward-regexp "[[:graph:]]" nil t)
+  (while (jsx--in-comment-p)
+    ;; move to the beggining of the comment
+    (search-backward-regexp "/\\*\\|//" nil t)
+    ;; move to the previous visible character
+    (search-backward-regexp "[[:graph:]]" nil t)))
+
+(defun jsx--go-to-next-non-comment-char ()
+  (if (looking-at "[[:graph:]]")
+      (forward-char))
+  (search-forward-regexp "[[:graph:]]" nil t)
+  (while (save-excursion (forward-char) (jsx--in-comment-p))
+    ;; move to the end of the comment
+    (search-forward-regexp "\\*/\\|$" nil t)
+    ;; move to the next visible character
+    (search-forward-regexp "[[:graph:]]" nil t)))
+
+(defun jsx--up-list (&optional arg)
+  "Return t if succeeded otherwise nil"
+  (ignore-errors (up-list arg) t))
 
 (defun jsx-indent-line ()
   (interactive)
-  (let ((indent-length (jsx-calculate-indentation))
+  (let ((indent-length (jsx--calculate-indentation))
         (offset (- (current-column) (current-indentation))))
     (when indent-length
       (indent-line-to indent-length)
       (if (> offset 0) (forward-char offset)))))
 
-(defun jsx-calculate-indentation (&optional pos)
+(defun jsx--calculate-indentation ()
+  ;; TODO: refactoring
   (save-excursion
-    (if pos
-        (goto-char pos)
-      (back-to-indentation))
-    (let* ((cw (current-word))
-           (ca (char-after))
-           (depth (jsx--calculate-depth)))
-      (if (or (eq ca ?})
-              (eq ca ?\))
-              (equal cw "case")
-              (equal cw "default"))
-          (setq depth (1- depth)))
-      (cond
-       ((jsx--in-string-or-comment-p) nil)
-       (t (* jsx-indent-level depth))
-       ))))
+    (back-to-indentation)
+    (if (jsx--in-string-or-comment-p)
+        nil
+      (let* ((cw (current-word))
+             (ca (char-after)))
+        (cond
+         ((or (eq ca ?{)
+              (eq ca ?\())
+          (progn (jsx--go-to-previous-non-comment-char) (current-indentation)))
+         ((and
+           (or (eq ca ?})
+               (eq ca ?\))
+               (equal cw "case")
+               (equal cw "default"))
+           (jsx--up-list -1))
+          (back-to-indentation)
+          (while (jsx--in-arg-definition-p)
+            (jsx--up-list -1)
+            (back-to-indentation))
+          (current-indentation))
+         ((jsx--non-block-statement-p)
+          (+ (progn
+               (jsx--go-to-previous-non-comment-char)
+               (current-indentation))
+             jsx-indent-level))
+         ((jsx--in-arg-definition-p)
+          (progn
+            (jsx--go-to-previous-non-comment-char)
+            (if (= (char-after) ?\()
+                (+ (current-indentation) jsx-indent-level)
+              (jsx--up-list -1)
+              (jsx--go-to-next-non-comment-char)
+              (backward-char)
+              (current-column))))
+         ((jsx--up-list -1)
+          (back-to-indentation)
+          (while (jsx--in-arg-definition-p)
+            (jsx--up-list -1)
+            (back-to-indentation))
+          (+ (current-column) jsx-indent-level))
+         (t 0)
+         )))))
 
-(defun jsx-compile-file (&optional options dst)
+
+;; compile or run the buffer
+
+(defun jsx--some-buffers-modified-p ()
+  (let ((bufs (buffer-list))
+        buf modified-p)
+    (while (and (not modified-p) bufs)
+      (setq buf (car bufs))
+      (when (string-match-p "\\.jsx\\'" (buffer-name buf))
+        (with-current-buffer buf
+          (setq modified-p (buffer-modified-p))))
+      (setq bufs (cdr bufs)))
+    modified-p))
+
+(defun jsx-compile-file (&optional options dst async)
   "Compile the JSX script of the current buffer
 and make a JS script in the same directory."
   (interactive)
-  ;; TODO: save another temporary file or popup dialog to ask whether or not to save
-  (save-buffer)
+  (if (jsx--some-buffers-modified-p)
+      (save-some-buffers nil t))
   ;; FIXME: file-name-nondirectory needs temporarily
   (let* ((jsx-file (file-name-nondirectory (buffer-file-name)))
          (js-file (or dst (substring jsx-file 0 -1)))
-         cmd)
+         (cmd jsx-cmd))
+    (setq options (append jsx-cmd-options options))
     (if options
-        (setq cmd (format "%s %s --output %s %s" jsx-cmd options js-file jsx-file))
-      (setq cmd (format "%s --output %s %s" jsx-cmd js-file jsx-file)))
-    (message "Compiling...")
-    (message cmd)
+        (setq cmd (format "%s %s" cmd (mapconcat 'identity options " "))))
+    (setq cmd (format "%s --output %s %s" cmd js-file jsx-file))
+    (if async
+        (setq cmd (concat cmd " &")))
+    (message "Compiling...: %s" cmd)
     (if (eq (shell-command cmd) 0) js-file nil)))
 
+(defun jsx-compile-file-async (&optional options dst)
+  "Compile the JSX scirpt of the current buffer asynchronously
+and make a JS script in the same directory."
+  (interactive)
+  (jsx-compile-file options dst t))
 
-;; TODO: if JS file already exits, run the script even though the compilcation failed
 (defun jsx-compile-file-and-run ()
   "Compile the JSX script of the current buffer,
 make a JS script in the same directory, and run it."
   (interactive)
-  (let* ((js-file (jsx-compile-file "--executable"))
+  (let* ((js-file (jsx-compile-file '("--executable")))
          (cmd (format "%s %s" jsx-node-cmd js-file)))
     (if js-file
         (shell-command cmd))))
+
+(defun jsx-run-buffer (&optional options)
+  "Run the JSX script of the current buffer."
+  (interactive)
+  (if (jsx--some-buffers-modified-p)
+      (save-some-buffers nil t))
+  (let ((jsx-file (file-name-nondirectory (buffer-file-name)))
+        (cmd jsx-cmd))
+    (setq options (append jsx-cmd-options options))
+    (if options
+        (setq cmd (format "%s %s" cmd (mapconcat 'identity options " "))))
+    (setq cmd (format "%s --run %s" cmd jsx-file))
+    (shell-command cmd)))
+
+
+;; flymake
+
+(defvar jsx-err-line-patterns
+  '(("\\[\\(.*\\):\\([0-9]+\\)\\] \\(.*\\)" 1 2 nil 3)))
+
+(defun jsx-flymake-on ()
+  "Turn on `flymake-mode' in `jsx-mode'"
+  (interactive)
+  (set (make-local-variable 'flymake-err-line-patterns) jsx-err-line-patterns)
+  (add-to-list 'flymake-allowed-file-name-masks '("\\.jsx\\'" jsx--flymake-init))
+  (flymake-mode t))
+
+(defun jsx-flymake-off ()
+  "Turn off `flymake-mode' in `jsx-mode'"
+  (interactive)
+  (flymake-mode 0))
+
+(defun jsx--flymake-init ()
+  (let* ((temp-file (flymake-init-create-temp-buffer-copy
+                     ;; if use import "*.jsx", _flymake.jsx is very annoying,
+                     ;; so not use 'flymake-create-temp-inplace
+                     (lambda (file-name prefix)
+                       (concat
+                        (flymake-create-temp-inplace file-name prefix) ".tmp"))))
+         (local-file (file-relative-name
+                      temp-file
+                      (file-name-directory buffer-file-name))))
+    (list jsx-cmd (append jsx-cmd-options
+                          (list "--mode" jsx-syntax-check-mode local-file)))))
+
+(defun jsx--get-errs-for-current-line ()
+  "Return the list of errors/warnings for the current line"
+  (let* ((line-no             (flymake-current-line-no))
+         (line-err-info-list  (nth 0 (flymake-find-err-info flymake-err-info line-no)))
+         (msgs '()))
+    (dolist (err-info line-err-info-list)
+      (let* ((text (flymake-ler-text err-info))
+             (line (flymake-ler-line err-info)))
+        (setq msgs (append msgs (list (format "[%s] %s" line text))))))
+    msgs))
+
+(defun jsx-display-err-for-current-line ()
+  "Display the errors/warnings for the current line in the echo area
+if there are any errors or warnings in `jsx-mode'."
+  (interactive)
+  (let ((msgs (jsx--get-errs-for-current-line)))
+    (message (mapconcat 'identity msgs "\n"))))
+
+(defun jsx-display-popup-err-for-current-line ()
+  "Display a popup window with errors/warnings for the current line
+if there are any errors or warnings in `jsx-mode'."
+  (interactive)
+  (let ((msgs (jsx--get-errs-for-current-line)))
+    (if (require 'popup nil t)
+        (popup-tip (mapconcat 'identity msgs "\n"))
+      (message "`popup' is not instelled."))))
 
 
 (define-derived-mode jsx-mode fundamental-mode "Jsx"
@@ -451,6 +646,8 @@ make a JS script in the same directory, and run it."
        '(jsx-font-lock-keywords nil nil))
   (set (make-local-variable 'indent-line-function) 'jsx-indent-line)
   (set (make-local-variable 'comment-start) "// ")
-  (set (make-local-variable 'comment-end) ""))
+  (set (make-local-variable 'comment-end) "")
+  (if jsx-use-flymake
+      (jsx-flymake-on)))
 
 (provide 'jsx-mode)

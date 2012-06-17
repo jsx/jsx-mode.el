@@ -1,12 +1,24 @@
 # jsx-mode.el --- major mode for JSX codes
 
 ## USAGE
+### Get Started
 
 Put this file in your Emacs lisp path (e.g. ~/.emacs.d/site-lisp)
-and add to the following lines to your .emacs:
+and add to the following lines to your ~/.emacs.d/init.el.
 
     (add-to-list 'auto-mode-alist '("\\.jsx\\'" . jsx-mode))
     (autoload 'jsx-mode "jsx-mode" "JSX mode" t)
+
+See also init.el.example.
+
+### Key Bindings
+
+In `jsx-mode', the following keys are bound by default.
+
+    C-c C-c     comment-region (Comment or uncomment each line in the region)
+    C-c c       jsx-compile-file (Compile the current buffer)
+    C-c C       jsx-compile-file-async (Compile the current buffer asynchronously)
+    C-c C-r     jsx-run-buffer (Run the current buffer)
 
 
 ## AUTHOR
