@@ -518,12 +518,23 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
 
 ;; compile or run the buffer
 
+(defun jsx--some-buffers-modified-p ()
+  (let ((bufs (buffer-list))
+        buf modified-p)
+    (while (and (not modified-p) bufs)
+      (setq buf (car bufs))
+      (when (string-match-p "\\.jsx\\'" (buffer-name buf))
+        (with-current-buffer buf
+          (setq modified-p (buffer-modified-p))))
+      (setq bufs (cdr bufs)))
+    modified-p))
+
 (defun jsx-compile-file (&optional options dst async)
   "Compile the JSX script of the current buffer
 and make a JS script in the same directory."
   (interactive)
-  ;; TODO: save another temporary file or popup dialog to ask whether or not to save
-  (save-buffer)
+  (if (jsx--some-buffers-modified-p)
+      (save-some-buffers nil t))
   ;; FIXME: file-name-nondirectory needs temporarily
   (let* ((jsx-file (file-name-nondirectory (buffer-file-name)))
          (js-file (or dst (substring jsx-file 0 -1)))
@@ -555,7 +566,8 @@ make a JS script in the same directory, and run it."
 (defun jsx-run-buffer (&optional options)
   "Run the JSX script of the current buffer."
   (interactive)
-  (save-buffer)
+  (if (jsx--some-buffers-modified-p)
+      (save-some-buffers nil t))
   (let ((jsx-file (file-name-nondirectory (buffer-file-name)))
         (cmd jsx-cmd))
     (setq options (append jsx-cmd-options options))
