@@ -36,12 +36,14 @@
 ;; * support imenu
 ;; * fix a bug that any token after implements is colored
 ;;   e.g. 'J' will be colored in the code like 'class C implements I { J'
+;; * support indentations for lambda statment
+;; * support auto-complete
 
 ;;; Code:
 
 (require 'thingatpt)
 
-(defconst jsx-version "0.0.3"
+(defconst jsx-version "0.1.0"
   "Version of `jsx-mode'")
 
 (defgroup jsx nil
