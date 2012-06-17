@@ -41,7 +41,13 @@
 
 ;;; Code:
 
-(require 'thingatpt)
+(eval-and-compile
+  (require 'thingatpt)
+  (require 'flymake))
+
+(eval-when-compile
+  (require 'popup nil t))
+
 
 (defconst jsx-version "0.1.0"
   "Version of `jsx-mode'")
@@ -606,7 +612,7 @@ if there are any errors or warnings in `jsx-mode'."
   (set (make-local-variable 'indent-line-function) 'jsx-indent-line)
   (set (make-local-variable 'comment-start) "// ")
   (set (make-local-variable 'comment-end) "")
-  (if (and jsx-use-flymake (require 'flymake nil t))
+  (if jsx-use-flymake
       (jsx-flymake-on)))
 
 (provide 'jsx-mode)

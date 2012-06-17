@@ -1,4 +1,7 @@
 TARGET=jsx-mode
+ifdef DIR
+	OPT=-L $(DIR)
+endif
 
 all: $(TARGET).elc
 
@@ -12,6 +15,6 @@ test:
 	-@emacs --script test/indent-test.el
 
 .el.elc:
-	@emacs -batch -f batch-byte-compile $<
+	emacs $(OPT) -batch -f batch-byte-compile $<
 
 .PHONY: clean test
