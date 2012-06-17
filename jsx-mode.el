@@ -468,13 +468,14 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
 
 (defun jsx-indent-line ()
   (interactive)
-  (let ((indent-length (jsx-calculate-indentation))
+  (let ((indent-length (jsx--calculate-indentation))
         (offset (- (current-column) (current-indentation))))
     (when indent-length
       (indent-line-to indent-length)
       (if (> offset 0) (forward-char offset)))))
 
-(defun jsx-calculate-indentation ()
+(defun jsx--calculate-indentation ()
+  ;; TODO: refactoring
   (save-excursion
     (back-to-indentation)
     (if (jsx--in-string-or-comment-p)
@@ -590,7 +591,7 @@ make a JS script in the same directory, and run it."
   "Turn on `flymake-mode' in `jsx-mode'"
   (interactive)
   (set (make-local-variable 'flymake-err-line-patterns) jsx-err-line-patterns)
-  (add-to-list 'flymake-allowed-file-name-masks '("\\.jsx\\'" jsx-flymake-init))
+  (add-to-list 'flymake-allowed-file-name-masks '("\\.jsx\\'" jsx--flymake-init))
   (flymake-mode t))
 
 (defun jsx-flymake-off ()
@@ -598,7 +599,7 @@ make a JS script in the same directory, and run it."
   (interactive)
   (flymake-mode 0))
 
-(defun jsx-flymake-init ()
+(defun jsx--flymake-init ()
   (let* ((temp-file (flymake-init-create-temp-buffer-copy
                      ;; if use import "*.jsx", _flymake.jsx is very annoying,
                      ;; so not use 'flymake-create-temp-inplace
