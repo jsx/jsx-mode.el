@@ -659,11 +659,20 @@ if there are any errors or warnings in `jsx-mode'."
 (defvar jsx-ac-source
   '((candidates . jsx--get-candidates)
     (prefix . jsx--ac-prefix)
-    (requires . 0)
     (cache)))
 
 (defun jsx--ac-prefix ()
+  "Enable completion even if after invisible characters."
   (or (ac-prefix-default) (point)))
+
+(defadvice auto-complete (before jsx--add-requires-to-ac-source)
+  "Invoke completion whenever auto-complete is executed."
+  (if (string= major-mode "jsx-mode")
+      (add-to-list 'jsx-ac-source '(requires . 0))))
+
+(defadvice auto-complete (after jsx--remove-requires-from-ac-source)
+  (if (string= major-mode "jsx-mode")
+      (setq jsx-ac-source (delete '(requires . 0) jsx-ac-source))))
 
 (defun jsx--copy-buffer-to-tmp-file ()
   (let ((tmpfile (make-temp-name (concat (buffer-file-name) "."))))
@@ -705,6 +714,8 @@ if there are any errors or warnings in `jsx-mode'."
   (when (and jsx-use-auto-complete (require 'auto-complete nil t))
     (require 'json)
     (add-to-list 'ac-modes 'jsx-mode)
+    (ad-enable-regexp "^jsx-")
+    (ad-activate-regexp "^jsx-")
     (setq ac-sources '(jsx-ac-source ac-source-filename)))
   (if jsx-use-flymake
       (jsx-flymake-on)))
