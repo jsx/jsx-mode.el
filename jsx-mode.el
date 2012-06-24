@@ -652,7 +652,6 @@ if there are any errors or warnings in `jsx-mode'."
 
 ;; auto-complete
 ;; TODO:
-;; * cache
 ;; * shell-command-on-region show output (not use shell-command-on-region)
 
 (defvar jsx--candidates-buffer "*jsx-candidates-buffer*")
@@ -660,7 +659,8 @@ if there are any errors or warnings in `jsx-mode'."
 (defvar jsx-ac-source
   '((candidates . jsx--get-candidates)
     (prefix . jsx--ac-prefix)
-    (requires . 0)))
+    (requires . 0)
+    (cache)))
 
 (defun jsx--ac-prefix ()
   (or (ac-prefix-default) (point)))
@@ -672,14 +672,16 @@ if there are any errors or warnings in `jsx-mode'."
 
 (defun jsx--parse-candidates (str)
   (let ((json-array-type 'list)
-        (candidates (json-read-from-string str))
-        (prefix (word-at-point)))
-    (mapcar (lambda (candidate) (concat prefix candidate)) candidates)))
+        (candidates (json-read-from-string str)))
+    candidates))
 
 (defun jsx--get-candidates ()
   (let ((tmpfile (jsx--copy-buffer-to-tmp-file))
         (line (line-number-at-pos))
-        (col (1+ (current-column)))
+        (col (save-excursion
+               (if (looking-back "\\sw")
+                   (backward-word))
+               (1+ (current-column))))
         cmd)
     (setq cmd (jsx--generate-cmd
                (list "--complete" (format "%d:%d" line col)  tmpfile)))
