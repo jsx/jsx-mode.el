@@ -67,7 +67,7 @@
   (require 'popup nil t))
 
 
-(defconst jsx-version "0.1.0"
+(defconst jsx-version "0.1.1"
   "Version of `jsx-mode'")
 
 (defgroup jsx nil
@@ -483,8 +483,7 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
       (let* ((cw (current-word))
              (ca (char-after)))
         (cond
-         ((or (eq ca ?{)
-              (eq ca ?\())
+         ((eq ca ?{)
           (progn (jsx--go-to-previous-non-comment-char) (current-indentation)))
          ((and
            (or (eq ca ?})
