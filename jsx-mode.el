@@ -255,8 +255,8 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
    "\\(/\\)"
    ;; first character
    ;; "/*" means beginning of a comment, so exclude "*"
-   "\\(?:\\\\.\\|[^/\\\n*]\\)"
-   "\\(?:\\\\.\\|[^/\\\n]*\\)*"
+   "\\(?:\\\\.\\|[^/\\*]\\)"
+   "\\(?:\\\\.\\|[^/\\]*\\)*"
    ;; end of a regex literal
    "\\(/\\)\\([gim]*\\)"))
 
