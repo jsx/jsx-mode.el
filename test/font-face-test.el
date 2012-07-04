@@ -54,7 +54,7 @@
         nil
       (replace-regexp-in-string
        "[ \t\r\n]+$" ""
-       (buffer-substring (point) (next-property-change (point) buf))))))
+       (buffer-substring (point) (or (next-property-change (point) buf) (point-max)))))))
 
 (defun equal-face (a b)
   (eq (get-text-property 0 'face a) (get-text-property 0 'face b)))
