@@ -67,7 +67,7 @@
   (require 'popup nil t))
 
 
-(defconst jsx-version "0.1.1"
+(defconst jsx-version "0.1.2"
   "Version of `jsx-mode'")
 
 (defgroup jsx nil
@@ -250,8 +250,15 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
 
 (defconst jsx--regex-literal-re
   (concat
-   "\\(?:^\\|[(,;:]\\)\\s-*"
-   "\\(/[^/\\\n]*\\(?:\\\\.[^/\\\n]*\\)*/[gim]*\\)"))
+   "\\(?:^\\|[(,;:=]\\)\\s-*"
+   ;; beginning of a regex literal
+   "\\(/\\)"
+   ;; first character
+   ;; "/*" means beginning of a comment, so exclude "*"
+   "\\(?:\\\\.\\|[^/\\\n*]\\)"
+   "\\(?:\\\\.\\|[^/\\\n]*\\)*"
+   ;; end of a regex literal
+   "\\(/\\)\\([gim]*\\)"))
 
 (defconst jsx--builtin-function-re
   (concat
@@ -314,7 +321,7 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
   `(
     (,jsx--constant-variable-re 0 font-lock-constant-face)
     (,jsx--builtin-function-re 1 font-lock-builtin-face)
-    (,jsx--regex-literal-re 1 font-lock-string-face)
+    (,jsx--regex-literal-re 3 font-lock-string-face)
     (,jsx--variable-definition-with-class-re
      (1 font-lock-variable-name-face)
      (2 font-lock-type-face))
@@ -425,6 +432,9 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
     (,jsx--function-definition-re 1 font-lock-function-name-face)
     (,jsx--function-definition-in-map-re 1 font-lock-function-name-face)
     ))
+
+(defvar jsx-font-lock-syntactic-keywords
+  `((,jsx--regex-literal-re (1 "|") (2 "|"))))
 
 
 (defun jsx--in-string-or-comment-p (&optional pos)
@@ -643,6 +653,8 @@ if there are any errors or warnings in `jsx-mode'."
   :syntax-table jsx-mode-syntax-table
   (set (make-local-variable 'font-lock-defaults)
        '(jsx-font-lock-keywords nil nil))
+  (set (make-local-variable 'font-lock-syntactic-keywords)
+       jsx-font-lock-syntactic-keywords)
   (set (make-local-variable 'indent-line-function) 'jsx-indent-line)
   (set (make-local-variable 'comment-start) "// ")
   (set (make-local-variable 'comment-end) "")
