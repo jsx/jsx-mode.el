@@ -67,7 +67,7 @@
   (require 'popup nil t))
 
 
-(defconst jsx-version "0.1.2"
+(defconst jsx-version "0.1.4"
   "Version of `jsx-mode'")
 
 (defgroup jsx nil
@@ -457,7 +457,7 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
 (defun jsx--go-to-previous-non-comment-char ()
   (search-backward-regexp "[[:graph:]]" nil t)
   (while (jsx--in-comment-p)
-    ;; move to the beggining of the comment
+    ;; move to the beginning of the comment
     (search-backward-regexp "/\\*\\|//" nil t)
     ;; move to the previous visible character
     (search-backward-regexp "[[:graph:]]" nil t)))
@@ -472,9 +472,13 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
     ;; move to the next visible character
     (search-forward-regexp "[[:graph:]]" nil t)))
 
-(defun jsx--up-list (&optional arg)
-  "Return t if succeeded otherwise nil"
-  (ignore-errors (up-list arg) t))
+(defun jsx--backward-up-list (&optional level ppss)
+  "Move back outside of parentheses LEVEL times
+and return the position if suceeded.
+If LEVEL is larger than the current depth, the ourermost leve is used."
+  (let* ((pos-list (nth 9 (or ppss (syntax-ppss))))
+         (pos (nth (- (length pos-list) (or level 1)) pos-list)))
+    (and pos (goto-char pos))))
 
 (defun jsx-indent-line ()
   (interactive)
@@ -488,46 +492,62 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
   ;; TODO: refactoring
   (save-excursion
     (back-to-indentation)
-    (if (jsx--in-string-or-comment-p)
-        nil
-      (let* ((cw (current-word))
-             (ca (char-after)))
-        (cond
-         ((eq ca ?{)
-          (progn (jsx--go-to-previous-non-comment-char) (current-indentation)))
-         ((and
-           (or (eq ca ?})
-               (eq ca ?\))
-               (equal cw "case")
-               (equal cw "default"))
-           (jsx--up-list -1))
-          (back-to-indentation)
-          (while (jsx--in-arg-definition-p)
-            (jsx--up-list -1)
-            (back-to-indentation))
-          (current-indentation))
-         ((jsx--non-block-statement-p)
-          (+ (progn
-               (jsx--go-to-previous-non-comment-char)
-               (current-indentation))
-             jsx-indent-level))
-         ((jsx--in-arg-definition-p)
-          (progn
-            (jsx--go-to-previous-non-comment-char)
-            (if (= (char-after) ?\()
-                (+ (current-indentation) jsx-indent-level)
-              (jsx--up-list -1)
-              (jsx--go-to-next-non-comment-char)
-              (backward-char)
-              (current-column))))
-         ((jsx--up-list -1)
-          (back-to-indentation)
-          (while (jsx--in-arg-definition-p)
-            (jsx--up-list -1)
-            (back-to-indentation))
-          (+ (current-column) jsx-indent-level))
-         (t 0)
-         )))))
+    (let* ((cw (current-word))
+           (ca (char-after))
+           (ppss (syntax-ppss)))
+      (cond
+       ((eq (syntax-ppss-context ppss) 'string)
+        nil)
+       ((eq (syntax-ppss-context ppss) 'comment)
+        (save-excursion
+          (let ((end-of-comment-p (looking-at "\\*/")))
+            (forward-line -1)
+            (back-to-indentation)
+            (if (eq (point) (nth 8 ppss))
+                ;; the previous line is the beginning of the comment
+                (+ (current-column) (if (eq ca ?*) 1 2))
+              ;; the indentation level of the end of the comment
+              ;; should be the same level as its beginning
+              ;; if the previous line doesn't begin with '*'
+              (when (and end-of-comment-p
+                         (not (eq (char-after) ?*)))
+                (goto-char (nth 8 ppss)))
+              (current-column)))))
+        ((eq ca ?{)
+         (progn (jsx--go-to-previous-non-comment-char) (current-indentation)))
+        ((and
+          (or (eq ca ?})
+              (eq ca ?\))
+              (equal cw "case")
+              (equal cw "default"))
+          (jsx--backward-up-list 1 ppss))
+         (back-to-indentation)
+         (while (jsx--in-arg-definition-p)
+           (jsx--backward-up-list)
+           (back-to-indentation))
+         (current-indentation))
+        ((jsx--non-block-statement-p)
+         (+ (progn
+              (jsx--go-to-previous-non-comment-char)
+              (current-indentation))
+            jsx-indent-level))
+        ((jsx--in-arg-definition-p)
+         (progn
+           (jsx--go-to-previous-non-comment-char)
+           (if (= (char-after) ?\()
+               (+ (current-indentation) jsx-indent-level)
+             (jsx--backward-up-list)
+             (jsx--go-to-next-non-comment-char)
+             (backward-char)
+             (current-column))))
+        ((jsx--backward-up-list 1 ppss)
+         (back-to-indentation)
+         (while (jsx--in-arg-definition-p)
+           (jsx--backward-up-list)
+           (back-to-indentation))
+         (+ (current-column) jsx-indent-level))
+        (t 0)
+        ))))
 
 
 ;; compile or run the buffer
