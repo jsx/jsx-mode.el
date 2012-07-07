@@ -67,7 +67,7 @@
   (require 'popup nil t))
 
 
-(defconst jsx-version "0.1.2"
+(defconst jsx-version "0.1.4"
   "Version of `jsx-mode'")
 
 (defgroup jsx nil
@@ -472,9 +472,13 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
     ;; move to the next visible character
     (search-forward-regexp "[[:graph:]]" nil t)))
 
-(defun jsx--up-list (&optional arg)
-  "Return t if succeeded otherwise nil"
-  (ignore-errors (up-list arg) t))
+(defun jsx--backward-up-list (&optional level)
+  "Move back outside of parentheses LEVEL times
+and return the position if suceeded.
+If LEVEL is larger than the current depth, the ourermost leve is used."
+  (let* ((pos-list (nth 9 (syntax-ppss)))
+         (pos (nth (- (length pos-list) (or level 1)) pos-list)))
+    (and pos (goto-char pos))))
 
 (defun jsx-indent-line ()
   (interactive)
@@ -500,10 +504,10 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
                (eq ca ?\))
                (equal cw "case")
                (equal cw "default"))
-           (jsx--up-list -1))
+           (jsx--backward-up-list))
           (back-to-indentation)
           (while (jsx--in-arg-definition-p)
-            (jsx--up-list -1)
+           (jsx--backward-up-list)
             (back-to-indentation))
           (current-indentation))
          ((jsx--non-block-statement-p)
@@ -516,14 +520,14 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
             (jsx--go-to-previous-non-comment-char)
             (if (= (char-after) ?\()
                 (+ (current-indentation) jsx-indent-level)
-              (jsx--up-list -1)
+              (jsx--backward-up-list)
               (jsx--go-to-next-non-comment-char)
               (backward-char)
               (current-column))))
-         ((jsx--up-list -1)
+         ((jsx--backward-up-list)
           (back-to-indentation)
           (while (jsx--in-arg-definition-p)
-            (jsx--up-list -1)
+            (jsx--backward-up-list)
             (back-to-indentation))
           (+ (current-column) jsx-indent-level))
          (t 0)
