@@ -67,7 +67,7 @@
   (require 'popup nil t))
 
 
-(defconst jsx-version "0.1.4"
+(defconst jsx-version "0.1.5"
   "Version of `jsx-mode'")
 
 (defgroup jsx nil
@@ -255,8 +255,8 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
    "\\(/\\)"
    ;; first character
    ;; "/*" means beginning of a comment, so exclude "*"
-   "\\(?:\\\\.\\|[^/\\*]\\)"
-   "\\(?:\\\\.\\|[^/\\]*\\)*"
+   "\\(?:\\\\.\\|[^/\\*\n]\\)"
+   "\\(?:\\\\.\\|[^/\\\n]\\)*"
    ;; end of a regex literal
    "\\(/\\)\\([gim]*\\)"))
 
