@@ -187,7 +187,7 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
   '("boolean" "int" "number" "string"))
 
 (defconst jsx--extra-types
-  '("MayBeUndefined" "void" "variant"))
+  '("MayBeUndefined" "Nullable" "void" "variant"))
 
 (defconst jsx--reserved-classes
   '("Array"
