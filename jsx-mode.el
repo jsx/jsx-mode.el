@@ -67,7 +67,7 @@
   (require 'popup nil t))
 
 
-(defconst jsx-version "0.1.5"
+(defconst jsx-version "0.1.6"
   "Version of `jsx-mode'")
 
 (defgroup jsx nil
@@ -187,7 +187,7 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
   '("boolean" "int" "number" "string"))
 
 (defconst jsx--extra-types
-  '("MayBeUndefined" "void" "variant"))
+  '("MayBeUndefined" "Nullable" "void" "variant"))
 
 (defconst jsx--reserved-classes
   '("Array"
@@ -284,7 +284,7 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
   (concat
    ")\\s-*:\\s-*"
    "\\(?:" jsx--identifier-re "\\.\\)?"
-   "\\(" jsx--identifier-re "\\)\\s-*\\(?:[,{]\\|$\\)"))
+   "\\(" jsx--identifier-re "\\)\\s-*\\(?:[[,{]\\|$\\)"))
 
 (defconst jsx--template-class-re
   (concat "<\\s-*\\(" jsx--identifier-re "\\)\\s-*>"))
@@ -305,6 +305,19 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
   (concat
    "\\(" jsx--identifier-re "\\)\\s-*:\\s-*\\(" jsx--identifier-re "\\)"))
 
+(defconst jsx--import-from-re
+  (concat
+   "import\\s-+\\(" jsx--identifier-re "\\)\\s-*\\(from\\|$\\)?"))
+
+(defconst jsx--quoted-re
+  (concat
+   "'[^'\\]*\\(?:\\\\.[^'\\]*\\)*'"        ; single quote
+   "\\|"
+   "\"[^\"\\]*\\(?:\\\\.[^\"\\]*\\)*\""))  ; double quote
+
+(defconst jsx--import-into-re
+  (concat
+   "import\\s-+" jsx--quoted-re "\\s-+\\(into\\)"))
 
 
 (defun jsx--in-arg-definition-p ()
@@ -333,6 +346,10 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
     (,jsx--create-instance-re 1 font-lock-type-face)
     (,jsx--template-class-re  1 font-lock-type-face)
     (,jsx--return-class-re 1 font-lock-type-face)
+    (,jsx--import-from-re
+     (1 font-lock-type-face)
+     (2 font-lock-keyword-face))
+    (,jsx--import-into-re 1 font-lock-keyword-face)
 
     ;; color names of interface or mixin like implements A, B, C
     ,(list
