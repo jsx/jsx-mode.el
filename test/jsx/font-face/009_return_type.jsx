@@ -8,6 +8,10 @@
     Bar: font-lock-type-face
 
     true: font-lock-constant-face
+
+    function: font-lock-keyword-face
+    createFoos: font-lock-function-name-face
+    Foo: font-lock-type-face
 */
 
     function createFoo() : Foo {
@@ -18,3 +22,6 @@
     }
 
     true ? str.substring(pos) : str.substring(0, pos)
+
+    function createFoos() : Foo[] {
+    }

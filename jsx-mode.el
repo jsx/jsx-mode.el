@@ -67,7 +67,7 @@
   (require 'popup nil t))
 
 
-(defconst jsx-version "0.1.5"
+(defconst jsx-version "0.1.6"
   "Version of `jsx-mode'")
 
 (defgroup jsx nil
@@ -284,7 +284,7 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
   (concat
    ")\\s-*:\\s-*"
    "\\(?:" jsx--identifier-re "\\.\\)?"
-   "\\(" jsx--identifier-re "\\)\\s-*\\(?:[,{]\\|$\\)"))
+   "\\(" jsx--identifier-re "\\)\\s-*\\(?:[[,{]\\|$\\)"))
 
 (defconst jsx--template-class-re
   (concat "<\\s-*\\(" jsx--identifier-re "\\)\\s-*>"))
