@@ -67,7 +67,7 @@
   (require 'popup nil t))
 
 
-(defconst jsx-version "0.1.6"
+(defconst jsx-version "0.1.7"
   "Version of `jsx-mode'")
 
 (defgroup jsx nil
@@ -631,7 +631,7 @@ make a JS script in the same directory, and run it."
 ;; flymake
 
 (defvar jsx-err-line-patterns
-  '(("\\[\\(.*\\):\\([0-9]+\\)\\] \\(.*\\)" 1 2 nil 3)))
+  '(("\\[\\([^:]+\\):\\([0-9]+\\)\\(?::[0-9]+\\)?\\] \\(.*\\)" 1 2 nil 3)))
 
 (defun jsx-flymake-on ()
   "Turn on `flymake-mode' in `jsx-mode'"
