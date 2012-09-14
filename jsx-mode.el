@@ -374,7 +374,7 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
         "^\\s-*\\(" jsx--identifier-re "\\)\\(?:\\s-\\|$\\)")
       (list (concat "\\<" jsx--identifier-re "\\>")
             '(if (save-excursion
-                   (backward-word 2)
+                   (jsx--backward-non-comment-word 2)
                    (looking-at (concat
                                 (regexp-opt jsx--class-definitions)
                                 "\\s-*$")))
@@ -488,6 +488,14 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
     (search-forward-regexp "\\*/\\|$" nil t)
     ;; move to the next visible character
     (search-forward-regexp "[[:graph:]]" nil t)))
+
+(defun jsx--backward-non-comment-word (&optional arg)
+  (let ((cnt (or arg 1)))
+    (while (> cnt 0)
+      (backward-word)
+      (while (jsx--in-comment-p)
+        (backward-word))
+      (setq cnt (1- cnt)))))
 
 (defun jsx--backward-up-list (&optional level ppss)
   "Move back outside of parentheses LEVEL times
