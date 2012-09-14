@@ -67,7 +67,7 @@
   (require 'popup nil t))
 
 
-(defconst jsx-version "0.1.7"
+(defconst jsx-version "0.1.8"
   "Version of `jsx-mode'")
 
 (defgroup jsx nil
@@ -509,7 +509,7 @@ If LEVEL is larger than the current depth, the ourermost leve is used."
   ;; TODO: refactoring
   (save-excursion
     (back-to-indentation)
-    (let* ((cw (current-word))
+    (let* ((cw (current-word t))
            (ca (char-after))
            (ppss (syntax-ppss)))
       (cond
