@@ -121,6 +121,7 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
 (defvar jsx-mode-syntax-table
   (let ((st (make-syntax-table)))
     (modify-syntax-entry ?_  "w" st)
+    (modify-syntax-entry ?%  "." st)
     ;; C-style comments
     ;; cf. Syntax Tables > Syntax Descriptors > Syntax Flags
     (modify-syntax-entry ?/  ". 124b" st)
