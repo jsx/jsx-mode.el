@@ -336,9 +336,6 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
     (,jsx--constant-variable-re 0 font-lock-constant-face)
     (,jsx--builtin-function-re 1 font-lock-builtin-face)
     (,jsx--regex-literal-re 3 font-lock-string-face)
-    (,jsx--variable-definition-with-class-re
-     (1 font-lock-variable-name-face)
-     (2 font-lock-type-face))
     (,jsx--variable-definition-re 1 font-lock-variable-name-face)
     (,jsx--primitive-type-re 0 font-lock-type-face)
     (,jsx--reserved-class-re 1 font-lock-type-face)
@@ -351,6 +348,9 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
      (1 font-lock-type-face)
      (2 font-lock-keyword-face))
     (,jsx--import-into-re 1 font-lock-keyword-face)
+    (,jsx--variable-definition-with-class-re
+     (1 font-lock-variable-name-face)
+     (2 font-lock-type-face))
 
     ;; color names of interface or mixin like implements A, B, C
     ,(list

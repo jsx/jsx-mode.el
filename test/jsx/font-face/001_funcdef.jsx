@@ -41,6 +41,11 @@
     string: font-lock-type-face
     void: font-lock-type-face
     log: font-lock-builtin-face
+
+    var: font-lock-keyword-face
+    func: font-lock-variable-name-face
+    function: font-lock-keyword-face
+    void: font-lock-type-face
 */
 
 
@@ -55,3 +60,5 @@
             log b;
         };
     }
+
+    var func : function() : void;
