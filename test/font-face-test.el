@@ -29,7 +29,7 @@
 ;;; Code:
 
 (defun font-face-test-get-test-suite ()
-  (when (string-match "^/\\*\\(?:.\\|\n\\)*\\*/" (buffer-string))
+  (when (string-match "^/\\*\\(?:.\\|\n\\)*?\\*/" (buffer-string))
     (let ((beg (match-beginning 0))
           (end (match-end 0))
           expecteds actuals token)
