@@ -673,7 +673,10 @@ make a JS script in the same directory, and run it."
                       temp-file
                       (file-name-directory buffer-file-name))))
     (list jsx-cmd (append jsx-cmd-options
-                          (list "--mode" jsx-syntax-check-mode local-file)))))
+                          (list
+                           "--mode" jsx-syntax-check-mode
+                           "--output" "/dev/null"
+                           local-file)))))
 
 (defun jsx--get-errs-for-current-line ()
   "Return the list of errors/warnings for the current line"
