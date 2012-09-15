@@ -12,6 +12,9 @@
     /: font-lock-string-face
     a: font-lock-string-face
     /: font-lock-string-face
+    /: font-lock-string-face
+    [/*]: font-lock-string-face
+    /: font-lock-string-face
     /* /);: font-lock-comment-face
 */
 
@@ -21,4 +24,5 @@
               o/igm);
     str.match(/"/);
     var regex = /a/;
+    /[/*]/;
     str.match(/* /);

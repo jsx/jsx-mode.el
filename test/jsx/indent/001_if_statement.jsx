@@ -18,3 +18,8 @@ else  // 0
 {  // 0
     log "else";  // 4
 }  // 0
+
+while (true  // 0
+       || false) {  // 7
+    log "true";  // 4
+}  // 0
