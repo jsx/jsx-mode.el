@@ -472,6 +472,14 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
                (backward-word)
                (looking-at "\\(?:for\\|if\\|while\\)\\_>"))))))
 
+(defun jsx--in-condition-p ()
+  (when (list-at-point)
+    (save-excursion
+      (search-backward "(" nil t)
+      (forward-symbol -1)
+      (let ((word (word-at-point)))
+        (or (equal word "while") (equal word "if"))))))
+
 (defun jsx--go-to-previous-non-comment-char ()
   (search-backward-regexp "[[:graph:]]" nil t)
   (while (jsx--in-comment-p)
@@ -548,7 +556,7 @@ If LEVEL is larger than the current depth, the ourermost leve is used."
               (equal cw "default"))
           (jsx--backward-up-list 1 ppss))
          (back-to-indentation)
-         (while (jsx--in-arg-definition-p)
+         (while (or (jsx--in-arg-definition-p) (jsx--in-condition-p))
            (jsx--backward-up-list)
            (back-to-indentation))
          (current-indentation))
@@ -557,7 +565,7 @@ If LEVEL is larger than the current depth, the ourermost leve is used."
               (jsx--go-to-previous-non-comment-char)
               (current-indentation))
             jsx-indent-level))
-        ((jsx--in-arg-definition-p)
+        ((or (jsx--in-arg-definition-p) (jsx--in-condition-p))
          (progn
            (jsx--go-to-previous-non-comment-char)
            (if (= (char-after) ?\()
@@ -568,7 +576,7 @@ If LEVEL is larger than the current depth, the ourermost leve is used."
              (current-column))))
         ((jsx--backward-up-list 1 ppss)
          (back-to-indentation)
-         (while (jsx--in-arg-definition-p)
+         (while (or (jsx--in-arg-definition-p) (jsx--in-condition-p))
            (jsx--backward-up-list)
            (back-to-indentation))
          (+ (current-column) jsx-indent-level))
