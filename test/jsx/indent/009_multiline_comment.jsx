@@ -31,3 +31,10 @@ if (true) {  // 0
      comment  // 5
     */  // 4
 }  // 0
+
+switch (0) {
+case 0:
+    break;
+    // case 1:  // 4
+    //     break;  // 4
+}

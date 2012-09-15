@@ -67,7 +67,7 @@
   (require 'popup nil t))
 
 
-(defconst jsx-version "0.1.7"
+(defconst jsx-version "0.1.8"
   "Version of `jsx-mode'")
 
 (defgroup jsx nil
@@ -121,6 +121,7 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
 (defvar jsx-mode-syntax-table
   (let ((st (make-syntax-table)))
     (modify-syntax-entry ?_  "w" st)
+    (modify-syntax-entry ?%  "." st)
     ;; C-style comments
     ;; cf. Syntax Tables > Syntax Descriptors > Syntax Flags
     (modify-syntax-entry ?/  ". 124b" st)
@@ -255,8 +256,8 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
    "\\(/\\)"
    ;; first character
    ;; "/*" means beginning of a comment, so exclude "*"
-   "\\(?:\\\\.\\|[^/\\*\n]\\)"
-   "\\(?:\\\\.\\|[^/\\\n]\\)*"
+   "\\(?:\\[\\(?:\\\\.\\|[^]]\\)*\\]\\|\\\\.\\|[^/\\*\n]\\)"
+   "\\(?:\\[\\(?:\\\\.\\|[^]]\\)*\\]\\|\\\\.\\|\\|[^/\\\n]\\)*"
    ;; end of a regex literal
    "\\(/\\)\\([gim]*\\)"))
 
@@ -335,9 +336,6 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
     (,jsx--constant-variable-re 0 font-lock-constant-face)
     (,jsx--builtin-function-re 1 font-lock-builtin-face)
     (,jsx--regex-literal-re 3 font-lock-string-face)
-    (,jsx--variable-definition-with-class-re
-     (1 font-lock-variable-name-face)
-     (2 font-lock-type-face))
     (,jsx--variable-definition-re 1 font-lock-variable-name-face)
     (,jsx--primitive-type-re 0 font-lock-type-face)
     (,jsx--reserved-class-re 1 font-lock-type-face)
@@ -350,6 +348,9 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
      (1 font-lock-type-face)
      (2 font-lock-keyword-face))
     (,jsx--import-into-re 1 font-lock-keyword-face)
+    (,jsx--variable-definition-with-class-re
+     (1 font-lock-variable-name-face)
+     (2 font-lock-type-face))
 
     ;; color names of interface or mixin like implements A, B, C
     ,(list
@@ -374,7 +375,7 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
         "^\\s-*\\(" jsx--identifier-re "\\)\\(?:\\s-\\|$\\)")
       (list (concat "\\<" jsx--identifier-re "\\>")
             '(if (save-excursion
-                   (backward-word 2)
+                   (jsx--backward-non-comment-word 2)
                    (looking-at (concat
                                 (regexp-opt jsx--class-definitions)
                                 "\\s-*$")))
@@ -471,6 +472,14 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
                (backward-word)
                (looking-at "\\(?:for\\|if\\|while\\)\\_>"))))))
 
+(defun jsx--in-condition-p ()
+  (when (list-at-point)
+    (save-excursion
+      (search-backward "(" nil t)
+      (forward-symbol -1)
+      (let ((word (word-at-point)))
+        (or (equal word "while") (equal word "if"))))))
+
 (defun jsx--go-to-previous-non-comment-char ()
   (search-backward-regexp "[[:graph:]]" nil t)
   (while (jsx--in-comment-p)
@@ -488,6 +497,14 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
     (search-forward-regexp "\\*/\\|$" nil t)
     ;; move to the next visible character
     (search-forward-regexp "[[:graph:]]" nil t)))
+
+(defun jsx--backward-non-comment-word (&optional arg)
+  (let ((cnt (or arg 1)))
+    (while (> cnt 0)
+      (backward-word)
+      (while (jsx--in-comment-p)
+        (backward-word))
+      (setq cnt (1- cnt)))))
 
 (defun jsx--backward-up-list (&optional level ppss)
   "Move back outside of parentheses LEVEL times
@@ -509,7 +526,7 @@ If LEVEL is larger than the current depth, the ourermost leve is used."
   ;; TODO: refactoring
   (save-excursion
     (back-to-indentation)
-    (let* ((cw (current-word))
+    (let* ((cw (current-word t))
            (ca (char-after))
            (ppss (syntax-ppss)))
       (cond
@@ -539,7 +556,7 @@ If LEVEL is larger than the current depth, the ourermost leve is used."
               (equal cw "default"))
           (jsx--backward-up-list 1 ppss))
          (back-to-indentation)
-         (while (jsx--in-arg-definition-p)
+         (while (or (jsx--in-arg-definition-p) (jsx--in-condition-p))
            (jsx--backward-up-list)
            (back-to-indentation))
          (current-indentation))
@@ -548,7 +565,7 @@ If LEVEL is larger than the current depth, the ourermost leve is used."
               (jsx--go-to-previous-non-comment-char)
               (current-indentation))
             jsx-indent-level))
-        ((jsx--in-arg-definition-p)
+        ((or (jsx--in-arg-definition-p) (jsx--in-condition-p))
          (progn
            (jsx--go-to-previous-non-comment-char)
            (if (= (char-after) ?\()
@@ -559,7 +576,7 @@ If LEVEL is larger than the current depth, the ourermost leve is used."
              (current-column))))
         ((jsx--backward-up-list 1 ppss)
          (back-to-indentation)
-         (while (jsx--in-arg-definition-p)
+         (while (or (jsx--in-arg-definition-p) (jsx--in-condition-p))
            (jsx--backward-up-list)
            (back-to-indentation))
          (+ (current-column) jsx-indent-level))
@@ -656,7 +673,10 @@ make a JS script in the same directory, and run it."
                       temp-file
                       (file-name-directory buffer-file-name))))
     (list jsx-cmd (append jsx-cmd-options
-                          (list "--mode" jsx-syntax-check-mode local-file)))))
+                          (list
+                           "--mode" jsx-syntax-check-mode
+                           "--output" "/dev/null"
+                           local-file)))))
 
 (defun jsx--get-errs-for-current-line ()
   "Return the list of errors/warnings for the current line"
