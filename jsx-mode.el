@@ -658,6 +658,7 @@ if there are any errors or warnings in `jsx-mode'."
 
 (defvar jsx-ac-source
   '((candidates . jsx--get-candidates)
+    (document . jsx--get-document)
     (prefix . jsx--ac-prefix)
     (cache)))
 
@@ -681,8 +682,30 @@ if there are any errors or warnings in `jsx-mode'."
 
 (defun jsx--parse-candidates (str)
   (let ((json-array-type 'list)
-        (candidates (json-read-from-string str)))
-    candidates))
+        (candidates-info (json-read-from-string str)))
+    (mapcar 'jsx--make-candidate candidates-info)))
+
+(defun jsx--make-candidate (info)
+  (let ((candidate (assoc-default 'word info))
+        (args (assoc-default 'args info))
+        (desc (assoc-default 'doc info))
+        symbol doc)
+    (when args
+      (setq symbol "f")
+      (setq doc
+            (format "%s(%s) : %s\n\n"
+                    candidate
+                    (mapconcat
+                     (lambda (arg)
+                       (format "%s : %s"
+                               (assoc-default 'name arg)
+                               (assoc-default 'type arg)))
+                     args ", ")
+                    (assoc-default 'returnType info))))
+    (when desc
+      (setq doc (concat doc desc)))
+    (propertize candidate 'doc doc 'symbol symbol)))
+
 
 (defun jsx--get-candidates ()
   (let ((tmpfile (jsx--copy-buffer-to-tmp-file))
@@ -702,6 +725,9 @@ if there are any errors or warnings in `jsx-mode'."
               (setq content (buffer-string)))
             (jsx--parse-candidates content)))
       (delete-file tmpfile))))
+
+(defun jsx--get-document (candidate)
+  (get-text-property 0 'doc candidate))
 
 
 (define-derived-mode jsx-mode fundamental-mode "Jsx"
