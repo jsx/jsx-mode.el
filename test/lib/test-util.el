@@ -70,13 +70,13 @@
                    (errors '()))
               (if (= len 0)
                   (decf total-cnt)
-                (loop for i from 0 to (1- len) do
-                      (let ((expected (nth i expecteds))
-                            (actual (nth i actuals)))
-                        (condition-case ex
-                            (assert (funcall compare-func expected actual))
-                          (error
-                           (push-end (make-error-msg make-msg-func expected actual) errors)))))
+                (loop for i from 0 to (1- len)
+                      for expected = (nth i expecteds)
+                      for actual = (nth i actuals)
+                      do (condition-case ex
+                             (assert (funcall compare-func expected actual))
+                           (error
+                            (push-end (make-error-msg make-msg-func expected actual) errors))))
                 (if (= (length errors) 0)
                     (incf passed-cnt)
                   (setq msg (format "%sF %s:\n%s\n\n" msg file (join errors "\n\n")))

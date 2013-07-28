@@ -655,6 +655,10 @@ if there are any errors or warnings in `jsx-mode'."
 ;; * shell-command-on-region show output (not use shell-command-on-region)
 
 (defvar jsx--candidates-buffer "*jsx-candidates-buffer*")
+(defvar jsx--try-to-show-document-p nil)
+(defvar jsx--hard-line-feed
+  (propertize "\n" 'hard t)
+  "Line feed for `fill-region'")
 
 (defvar jsx-ac-source
   '((candidates . jsx--get-candidates)
@@ -681,31 +685,53 @@ if there are any errors or warnings in `jsx-mode'."
     tmpfile))
 
 (defun jsx--parse-candidates (str)
-  (let ((json-array-type 'list)
-        (candidates-info (json-read-from-string str)))
-    (mapcar 'jsx--make-candidate candidates-info)))
-
-(defun jsx--make-candidate (info)
-  (let ((candidate (assoc-default 'word info))
-        (args (assoc-default 'args info))
-        (desc (assoc-default 'doc info))
-        symbol doc)
-    (when args
-      (setq symbol "f")
-      (setq doc
-            (format "%s(%s) : %s\n\n"
-                    candidate
-                    (mapconcat
-                     (lambda (arg)
-                       (format "%s : %s"
-                               (assoc-default 'name arg)
-                               (assoc-default 'type arg)))
-                     args ", ")
-                    (assoc-default 'returnType info))))
-    (when desc
-      (setq doc (concat doc desc)))
-    (propertize candidate 'doc doc 'symbol symbol)))
-
+  ;; JSON example (cf. src/completion.jsx of JSX)
+  ;; {
+  ;;   "word" : "stringify",
+  ;;   "partialWord" : "ringify",
+  ;;   "doc" : "serialize a value or object as a JSON string",
+  ;;   "type" : "function (value : variant) : string",
+  ;;   "returnType" : "string",
+  ;;   "args" : [ { "name" : "value", "type" : "variant" } ],
+  ;;   "definedClass" : "JSON",
+  ;;   "definedFilename" : "lib/built-in/jsx",
+  ;;   "definedLineNumber" : 903
+  ;; }
+  (let* ((json-array-type 'list)
+         (candidates-info (json-read-from-string str))
+         candidates word prev-word docs symbol)
+    (setq candidates-info
+          (sort candidates-info (lambda (a b)
+                                  (string< (assoc-default 'word a)
+                                           (assoc-default 'word b)))))
+    (while candidates-info
+      (let* ((info (car candidates-info))
+             (args (assq 'args info))
+             (desc (or (assoc-default 'doc info) "not documented"))
+             (name (setq word (assoc-default 'word info))))
+        (when (and prev-word (not (string= word prev-word)))
+          (setq candidates
+                (append candidates
+                        (list (propertize prev-word 'docs docs 'symbol symbol))))
+          (setq docs)
+          (setq symbol))
+        (when args
+          (setq symbol "f")
+          (setq name
+                (format "%s(%s) : %s"
+                        word
+                        (mapconcat
+                         (lambda (arg)
+                           (format "%s : %s"
+                                   (assoc-default 'name arg)
+                                   (assoc-default 'type arg)))
+                         (cdr args) ", ")
+                        (assoc-default 'returnType info))))
+        (setq docs (append docs `(((name . ,name) (desc . ,desc))))))
+      (setq prev-word word)
+      (setq candidates-info (cdr candidates-info)))
+    (append candidates
+            (list (propertize prev-word 'docs docs 'symbol symbol)))))
 
 (defun jsx--get-candidates ()
   (let ((tmpfile (jsx--copy-buffer-to-tmp-file))
@@ -726,8 +752,42 @@ if there are any errors or warnings in `jsx-mode'."
             (jsx--parse-candidates content)))
       (delete-file tmpfile))))
 
+(defadvice fill-region (before jsx---fill-region activate)
+  (when jsx--try-to-show-document-p
+    (beginning-of-buffer)
+    (replace-string "\n" jsx--hard-line-feed)
+    (setq use-hard-newlines t)))
+
 (defun jsx--get-document (candidate)
-  (get-text-property 0 'doc candidate))
+  (setq jsx--try-to-show-document-p t)
+  (run-at-time 0 nil (lambda() (setq jsx--try-to-show-document-p)))
+  (let* ((docs (get-text-property 0 'docs candidate))
+         (use-hard-newlines t)
+         text names desc prev-desc)
+    (when docs
+      (setq docs
+            (sort (copy-alist docs) (lambda (a b)
+                                      (or
+                                       (string< (assoc-default 'desc a)
+                                                (assoc-default 'desc b))
+                                       (string< (assoc-default 'name a)
+                                                (assoc-default 'name b))))))
+      (while docs
+        (let ((doc (car docs)))
+          (setq desc (assoc-default 'desc doc))
+          (when (and prev-desc (not (string= desc prev-desc)))
+            (if text
+                (setq (concat "\n\n" text)))
+            (setq text (format "%s\n\n%s" names prev-desc))
+            (setq names))
+          (if names
+              (setq names (format "%s\n%s" names (assoc-default 'name doc)))
+            (setq names (assoc-default 'name doc)))
+          (setq prev-desc desc)
+          (setq docs (cdr docs))))
+      (if text
+          (format "%s\n\n%s\n\n%s" text names prev-desc)
+        (format "%s\n\n%s" names prev-desc)))))
 
 
 (define-derived-mode jsx-mode fundamental-mode "Jsx"
