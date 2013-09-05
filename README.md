@@ -1,4 +1,4 @@
-# jsx-mode.el --- major mode for JSX codes
+# jsx-mode.el --- major mode for JSX
 
 ## USAGE
 ### Get Started
