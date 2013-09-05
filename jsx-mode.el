@@ -1,9 +1,10 @@
-;;; jsx-mode.el --- major mode for JSX codes
+;;; jsx-mode.el --- major mode for JSX
 
 ;; Copyright (c) 2012 DeNA, Co., Ltd (http://dena.jp/intl/)
 
 ;; Author: Takeshi Arabiki (abicky)
 ;; Version: 0.1.10
+;; URL: https://github.com/jsx/jsx-mode.el
 
 ;; Permission is hereby granted, free of charge, to any person obtaining a copy
 ;; of this software and associated documentation files (the "Software"), to deal
@@ -59,11 +60,9 @@
 
 ;;; Code:
 
-(eval-and-compile
-  (require 'thingatpt)
-  (require 'flymake))
-
 (eval-when-compile
+  (require 'thingatpt)
+  (require 'flymake)
   (require 'popup nil t))
 
 
@@ -711,6 +710,7 @@ if there are any errors or warnings in `jsx-mode'."
       (message "`popup' is not instelled."))))
 
 
+;;;###autoload
 (define-derived-mode jsx-mode fundamental-mode "Jsx"
   :syntax-table jsx-mode-syntax-table
   (set (make-local-variable 'font-lock-defaults)
@@ -724,3 +724,4 @@ if there are any errors or warnings in `jsx-mode'."
       (jsx-flymake-on)))
 
 (provide 'jsx-mode)
+;;; jsx-mode.el ends here
