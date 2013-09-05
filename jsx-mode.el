@@ -3,7 +3,7 @@
 ;; Copyright (c) 2012 DeNA, Co., Ltd (http://dena.jp/intl/)
 
 ;; Author: Takeshi Arabiki (abicky)
-;; Version: See `jsx-version'
+;; Version: 0.1.10
 
 ;; Permission is hereby granted, free of charge, to any person obtaining a copy
 ;; of this software and associated documentation files (the "Software"), to deal
@@ -67,7 +67,7 @@
   (require 'popup nil t))
 
 
-(defconst jsx-version "0.1.8"
+(defconst jsx-version "0.1.10"
   "Version of `jsx-mode'")
 
 (defgroup jsx nil
