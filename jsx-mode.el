@@ -64,6 +64,7 @@
   (require 'flymake))
 
 (eval-when-compile
+  (require 'cl)
   (require 'json)
   (require 'auto-complete nil t)
   (require 'popup nil t))
@@ -758,36 +759,33 @@ if there are any errors or warnings in `jsx-mode'."
     (replace-string "\n" jsx--hard-line-feed)
     (setq use-hard-newlines t)))
 
+(defun jsx--sort-docs (a b)
+  (or
+   (string< (assoc-default 'desc a) (assoc-default 'desc b))
+   (string< (assoc-default 'name a) (assoc-default 'name b))))
+
 (defun jsx--get-document (candidate)
   (setq jsx--try-to-show-document-p t)
   (run-at-time 0 nil (lambda() (setq jsx--try-to-show-document-p)))
-  (let* ((docs (get-text-property 0 'docs candidate))
-         (use-hard-newlines t)
-         text names desc prev-desc)
+  (let ((docs (get-text-property 0 'docs candidate)))
     (when docs
-      (setq docs
-            (sort (copy-alist docs) (lambda (a b)
-                                      (or
-                                       (string< (assoc-default 'desc a)
-                                                (assoc-default 'desc b))
-                                       (string< (assoc-default 'name a)
-                                                (assoc-default 'name b))))))
-      (while docs
-        (let ((doc (car docs)))
-          (setq desc (assoc-default 'desc doc))
-          (when (and prev-desc (not (string= desc prev-desc)))
-            (if text
-                (setq (concat "\n\n" text)))
-            (setq text (format "%s\n\n%s" names prev-desc))
-            (setq names))
-          (if names
-              (setq names (format "%s\n%s" names (assoc-default 'name doc)))
-            (setq names (assoc-default 'name doc)))
-          (setq prev-desc desc)
-          (setq docs (cdr docs))))
-      (if text
-          (format "%s\n\n%s\n\n%s" text names prev-desc)
-        (format "%s\n\n%s" names prev-desc)))))
+      (setq docs (sort (copy-alist docs) 'jsx--sort-docs))
+      (loop with document and names
+            for doc in docs
+            for prev-desc = nil then desc
+            for desc = (assoc-default 'desc doc)
+            do (when (and prev-desc (not (equal desc prev-desc)))
+                 (if (and document (not (equal document "")))
+                     (setq document (concat "\n\n" document)))
+                 (setq document (format "%s\n\n%s" names prev-desc))
+                 (setq names nil))
+            do (if names
+                   (setq names (format "%s\n%s" names (assoc-default 'name doc)))
+                 (setq names (assoc-default 'name doc)))
+            finally return
+                    (if document
+                        (format "%s\n\n%s\n\n%s" document names desc)
+                        (format "%s\n\n%s" names desc))))))
 
 
 (define-derived-mode jsx-mode fundamental-mode "Jsx"
