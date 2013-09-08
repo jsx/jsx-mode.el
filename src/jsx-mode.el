@@ -63,6 +63,9 @@
 (eval-when-compile
   (require 'thingatpt)
   (require 'flymake)
+  (require 'cl)
+  (require 'json)
+  (require 'auto-complete nil t)
   (require 'popup nil t))
 
 
@@ -106,6 +109,11 @@ The value should be \"parse\" or \"compile\". (Default: \"parse\")"
 
 (defcustom jsx-use-flymake nil
   "Whether or not to use `flymake-mode' in `jsx-mode'."
+  :type 'boolean
+  :group 'jsx-mode)
+
+(defcustom jsx-use-auto-complete nil
+  "Whether or not to use `auto-complete-mode' in `jsx-mode'."
   :type 'boolean
   :group 'jsx-mode)
 
@@ -601,6 +609,10 @@ If LEVEL is larger than the current depth, the ourermost leve is used."
       (setq bufs (cdr bufs)))
     modified-p))
 
+(defun jsx--generate-cmd (&optional options)
+  (setq options (append jsx-cmd-options options))
+  (format "%s %s" jsx-cmd (mapconcat 'identity options " ")))
+
 (defun jsx-compile-file (&optional options dst async)
   "Compile the JSX script of the current buffer
 and make a JS script in the same directory."
@@ -610,11 +622,10 @@ and make a JS script in the same directory."
   ;; FIXME: file-name-nondirectory needs temporarily
   (let* ((jsx-file (file-name-nondirectory (buffer-file-name)))
          (js-file (or dst (substring jsx-file 0 -1)))
-         (cmd jsx-cmd))
+         cmd)
     (setq options (append jsx-cmd-options options))
-    (if options
-        (setq cmd (format "%s %s" cmd (mapconcat 'identity options " "))))
-    (setq cmd (format "%s --output %s %s" cmd js-file jsx-file))
+    (setq cmd (jsx--generate-cmd
+               (append options (list "--output" js-file jsx-file))))
     (if async
         (setq cmd (concat cmd " &")))
     (message "Compiling...: %s" cmd)
@@ -643,8 +654,8 @@ make a JS script in the same directory, and run it."
   (let ((jsx-file (file-name-nondirectory (buffer-file-name)))
         (cmd jsx-cmd))
     (setq options (append jsx-cmd-options options))
-    (if options
-        (setq cmd (format "%s %s" cmd (mapconcat 'identity options " "))))
+    (setq cmd (jsx--generate-cmd
+               (append options (list "--run" jsx-file))))
     (setq cmd (format "%s --run %s" cmd jsx-file))
     (shell-command cmd)))
 
@@ -710,6 +721,140 @@ if there are any errors or warnings in `jsx-mode'."
       (message "`popup' is not instelled."))))
 
 
+;; auto-complete
+
+(defvar jsx--try-to-show-document-p nil)
+(defvar jsx--hard-line-feed
+  (propertize "\n" 'hard t)
+  "Line feed for `fill-region'")
+
+(defvar jsx-ac-source
+  '((candidates . jsx--get-candidates)
+    (document . jsx--get-document)
+    (prefix . jsx--ac-prefix)
+    (cache)))
+
+(defun jsx--ac-prefix ()
+  "Enable completion even if after invisible characters."
+  (or (ac-prefix-default) (point)))
+
+(defadvice auto-complete (before jsx--add-requires-to-ac-source activate)
+  "Invoke completion whenever auto-complete is executed."
+  (if (string= major-mode "jsx-mode")
+      (add-to-list 'jsx-ac-source '(requires . 0))))
+
+(defadvice auto-complete (after jsx--remove-requires-from-ac-source activate)
+  (if (string= major-mode "jsx-mode")
+      (setq jsx-ac-source (delete '(requires . 0) jsx-ac-source))))
+
+(defun jsx--copy-buffer-to-tmp-file ()
+  (let ((tmpfile (make-temp-name (concat (buffer-file-name) "."))))
+    (write-region nil nil tmpfile nil 'silent)
+    tmpfile))
+
+(defun jsx--sort-candidates (a b)
+  (string< (assoc-default 'word a) (assoc-default 'word b)))
+
+(defun jsx--make-method-string (method args return-type)
+  (format "%s(%s) : %s"
+          method
+          (mapconcat
+           (lambda (arg)
+             (format "%s : %s"
+                     (assoc-default 'name arg)
+                     (assoc-default 'type arg)))
+           args ", ")
+          return-type))
+
+(defun jsx--parse-candidates (str)
+  ;; JSON example (cf. src/completion.jsx of JSX)
+  ;; {
+  ;;   "word" : "stringify",
+  ;;   "partialWord" : "ringify",
+  ;;   "doc" : "serialize a value or object as a JSON string",
+  ;;   "type" : "function (value : variant) : string",
+  ;;   "returnType" : "string",
+  ;;   "args" : [ { "name" : "value", "type" : "variant" } ],
+  ;;   "definedClass" : "JSON",
+  ;;   "definedFilename" : "lib/built-in/jsx",
+  ;;   "definedLineNumber" : 903
+  ;; }
+  (let* ((json-array-type 'list)
+         (candidates-info (json-read-from-string str)))
+    (when candidates-info
+      (setq candidates-info (sort candidates-info 'jsx--sort-candidates))
+      (loop with (candidates docs symbol)
+            for info in candidates-info
+            ;; (assoc-default 'args info) is nil if the method has no arguments
+            for args = (assq 'args info)
+            for desc = (or (assoc-default 'doc info) "not documented")
+            for prev-word = nil then word
+            for word = (assoc-default 'word info)
+            for name = word
+            when (and prev-word (not (equal word prev-word)))
+              collect (propertize prev-word 'docs docs 'symbol symbol)
+                into candidates
+                and do (setq docs)
+                and do (setq symbol)
+            do (when args
+                 (setq symbol "f")
+                 (setq name (jsx--make-method-string
+                             word (cdr args) (assoc-default 'returnType info))))
+            collect `((name . ,name) (desc . ,desc)) into docs
+            finally return
+                    (nconc candidates
+                           (list (propertize word 'docs docs 'symbol symbol)))))))
+
+(defun jsx--get-candidates ()
+  (let* ((tmpfile (jsx--copy-buffer-to-tmp-file))
+         (line (line-number-at-pos))
+         ;; don't use (current-column) for tab indents
+         (col (1+ (- (point) (line-beginning-position))))
+         (cmd (jsx--generate-cmd
+               (list "--complete" (format "%d:%d" line col)  tmpfile))))
+    (with-temp-buffer
+      (unwind-protect
+          (call-process-shell-command cmd nil t)
+        (delete-file tmpfile))
+      (jsx--parse-candidates (buffer-string)))))
+
+(defadvice fill-region (before jsx--fill-region activate)
+  "Preserve the line feeds in documents
+cf. https://github.com/auto-complete/popup-el/issues/43"
+  (when jsx--try-to-show-document-p
+    (beginning-of-buffer)
+    (replace-string "\n" jsx--hard-line-feed)
+    (setq use-hard-newlines t)))
+
+(defun jsx--sort-docs (a b)
+  (or
+   (string< (assoc-default 'desc a) (assoc-default 'desc b))
+   (string< (assoc-default 'name a) (assoc-default 'name b))))
+
+(defun jsx--get-document (candidate)
+  (setq jsx--try-to-show-document-p t)
+  (run-at-time 0 nil (lambda() (setq jsx--try-to-show-document-p)))
+  (let ((docs (get-text-property 0 'docs candidate)))
+    (when docs
+      (setq docs (sort (copy-alist docs) 'jsx--sort-docs))
+      (loop with document and names
+            for doc in docs
+            for prev-desc = nil then desc
+            for desc = (assoc-default 'desc doc)
+            do (when (and prev-desc (not (equal desc prev-desc)))
+                 (if (and document (not (equal document "")))
+                     (setq document (concat "\n\n" document)))
+                 (setq document (format "%s\n\n%s" names prev-desc))
+                 (setq names nil))
+            do (if names
+                   (setq names (format "%s\n%s" names (assoc-default 'name doc)))
+                 (setq names (assoc-default 'name doc)))
+            finally return
+                    (if document
+                        (format "%s\n\n%s\n\n%s" document names desc)
+                        (format "%s\n\n%s" names desc))))))
+
+
 ;;;###autoload
 (define-derived-mode jsx-mode fundamental-mode "Jsx"
   :syntax-table jsx-mode-syntax-table
@@ -720,6 +865,10 @@ if there are any errors or warnings in `jsx-mode'."
   (set (make-local-variable 'indent-line-function) 'jsx-indent-line)
   (set (make-local-variable 'comment-start) "// ")
   (set (make-local-variable 'comment-end) "")
+  (when (and jsx-use-auto-complete (require 'auto-complete nil t))
+    (require 'json)
+    (add-to-list 'ac-modes 'jsx-mode)
+    (setq ac-sources '(jsx-ac-source ac-source-filename)))
   (if jsx-use-flymake
       (jsx-flymake-on)))
 

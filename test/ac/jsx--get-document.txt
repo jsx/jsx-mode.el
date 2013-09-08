@@ -1,0 +1,64 @@
+jsx--get-document
+
+input: jsx-test-make-docs
+[
+    {
+        "docs": [
+            {
+                "desc": "doc1",
+                "name": "method1() : string"
+            },
+            {
+                "desc": "doc2",
+                "name": "method1(foo : number) : string"
+            },
+            {
+                "desc": "doc1",
+                "name": "method1(foo : string) : string"
+            }
+        ],
+        "symbol": "f",
+        "word": "method1"
+    },
+    {
+        "docs": [
+            {
+                "desc": "not documented",
+                "name": "method2(foo : string, bar : number) : int"
+            }
+        ],
+        "symbol": "f",
+        "word": "method2"
+    },
+    {
+        "docs": [
+            {
+                "desc": "doc3",
+                "name": "variable1"
+            }
+        ],
+        "symbol": null,
+        "word": "variable1"
+    },
+    {
+        "docs": [
+            {
+                "desc": "not documented",
+                "name": "variable2"
+            }
+        ],
+        "symbol": null,
+        "word": "variable2"
+    }
+]
+
+expected: json-read-from-string
+[
+    "method1() : string\nmethod1(foo : string) : string\n\ndoc1\n\nmethod1(foo : number) : string\n\ndoc2",
+
+    "method2(foo : string, bar : number) : int\n\nnot documented",
+
+    "variable1\n\ndoc3",
+
+    "variable2\n\nnot documented"
+]

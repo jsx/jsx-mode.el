@@ -1,0 +1,130 @@
+jsx--parse-candidates
+
+input: jsx--parse-candidates
+[
+    {
+        "args": [],
+        "definedClass": "String",
+        "definedFilename": "/path/to/file",
+        "definedLineNumber": 337,
+        "doc": "doc1",
+        "returnType": "string",
+        "type": "String.function () : string",
+        "word": "method1"
+    },
+    {
+        "args": [
+            {
+                "name": "foo",
+                "type": "string"
+            },
+            {
+                "name": "bar",
+                "type": "number"
+            }
+        ],
+        "definedClass": "String",
+        "definedFilename": "/path/to/file",
+        "definedLineNumber": 347,
+        "returnType": "int",
+        "type": "String.function (: string, : number) : int",
+        "word": "method2"
+    },
+    {
+        "args": [
+            {
+                "name": "foo",
+                "type": "number"
+            }
+        ],
+        "definedClass": "String",
+        "definedFilename": "/path/to/file",
+        "definedLineNumber": 542,
+        "doc": "doc2",
+        "returnType": "string",
+        "type": "String.function () : string",
+        "word": "method1"
+    },
+    {
+        "args": [
+            {
+                "name": "foo",
+                "type": "string"
+            }
+        ],
+        "definedClass": "String",
+        "definedFilename": "/path/to/file",
+        "definedLineNumber": 600,
+        "doc": "doc1",
+        "returnType": "string",
+        "type": "String.function (: string) : string",
+        "word": "method1"
+    },
+    {
+        "definedClass": "String",
+        "definedFilename": "/path/to/file",
+        "definedLineNumber": 615,
+        "doc": "doc3",
+        "type": "int",
+        "word": "variable1"
+    },
+    {
+        "definedClass": "String",
+        "definedFilename": "/path/to/file",
+        "definedLineNumber": 620,
+        "type": "int",
+        "word": "variable2"
+    }
+]
+
+expected: jsx-test-propertize
+[
+    {
+        "docs": [
+            {
+                "desc": "doc1",
+                "name": "method1() : string"
+            },
+            {
+                "desc": "doc2",
+                "name": "method1(foo : number) : string"
+            },
+            {
+                "desc": "doc1",
+                "name": "method1(foo : string) : string"
+            }
+        ],
+        "symbol": "f",
+        "word": "method1"
+    },
+    {
+        "docs": [
+            {
+                "desc": "not documented",
+                "name": "method2(foo : string, bar : number) : int"
+            }
+        ],
+        "symbol": "f",
+        "word": "method2"
+    },
+    {
+        "docs": [
+            {
+                "desc": "doc3",
+                "name": "variable1"
+            }
+        ],
+        "symbol": null,
+        "word": "variable1"
+    },
+    {
+        "docs": [
+            {
+                "desc": "not documented",
+                "name": "variable2"
+            }
+        ],
+        "symbol": null,
+        "word": "variable2"
+    }
+]
