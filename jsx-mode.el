@@ -668,12 +668,12 @@ if there are any errors or warnings in `jsx-mode'."
   "Enable completion even if after invisible characters."
   (or (ac-prefix-default) (point)))
 
-(defadvice auto-complete (before jsx--add-requires-to-ac-source)
+(defadvice auto-complete (before jsx--add-requires-to-ac-source activate)
   "Invoke completion whenever auto-complete is executed."
   (if (string= major-mode "jsx-mode")
       (add-to-list 'jsx-ac-source '(requires . 0))))
 
-(defadvice auto-complete (after jsx--remove-requires-from-ac-source)
+(defadvice auto-complete (after jsx--remove-requires-from-ac-source activate)
   (if (string= major-mode "jsx-mode")
       (setq jsx-ac-source (delete '(requires . 0) jsx-ac-source))))
 
@@ -748,7 +748,9 @@ if there are any errors or warnings in `jsx-mode'."
         (delete-file tmpfile))
       (jsx--parse-candidates (buffer-string)))))
 
-(defadvice fill-region (before jsx---fill-region activate)
+(defadvice fill-region (before jsx--fill-region activate)
+  "Preserve the line feeds in documents
+cf. https://github.com/auto-complete/popup-el/issues/43"
   (when jsx--try-to-show-document-p
     (beginning-of-buffer)
     (replace-string "\n" jsx--hard-line-feed)
@@ -793,8 +795,6 @@ if there are any errors or warnings in `jsx-mode'."
   (when (and jsx-use-auto-complete (require 'auto-complete nil t))
     (require 'json)
     (add-to-list 'ac-modes 'jsx-mode)
-    (ad-enable-regexp "^jsx-")
-    (ad-activate-regexp "^jsx-")
     (setq ac-sources '(jsx-ac-source ac-source-filename)))
   (if jsx-use-flymake
       (jsx-flymake-on)))
