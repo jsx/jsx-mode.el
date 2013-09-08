@@ -652,10 +652,7 @@ if there are any errors or warnings in `jsx-mode'."
 
 
 ;; auto-complete
-;; TODO:
-;; * shell-command-on-region show output (not use shell-command-on-region)
 
-(defvar jsx--candidates-buffer "*jsx-candidates-buffer*")
 (defvar jsx--try-to-show-document-p nil)
 (defvar jsx--hard-line-feed
   (propertize "\n" 'hard t)
@@ -738,23 +735,16 @@ if there are any errors or warnings in `jsx-mode'."
                          (list (propertize word 'docs docs 'symbol symbol))))))
 
 (defun jsx--get-candidates ()
-  (let ((tmpfile (jsx--copy-buffer-to-tmp-file))
-        (line (line-number-at-pos))
-        (col (save-excursion
-               (if (looking-back "\\sw")
-                   (backward-word))
-               (1+ (current-column))))
-        cmd)
-    (setq cmd (jsx--generate-cmd
-               (list "--complete" (format "%d:%d" line col)  tmpfile)))
-    (unwind-protect
-        (progn
-          (shell-command-on-region (point) (point) cmd jsx--candidates-buffer)
-          (let (content)
-            (with-current-buffer jsx--candidates-buffer
-              (setq content (buffer-string)))
-            (jsx--parse-candidates content)))
-      (delete-file tmpfile))))
+  (let* ((tmpfile (jsx--copy-buffer-to-tmp-file))
+         (line (line-number-at-pos))
+         (col (1+ (current-column)))
+         (cmd (jsx--generate-cmd
+               (list "--complete" (format "%d:%d" line col)  tmpfile))))
+    (with-temp-buffer
+      (unwind-protect
+          (call-process-shell-command cmd nil t)
+        (delete-file tmpfile))
+      (jsx--parse-candidates (buffer-string)))))
 
 (defadvice fill-region (before jsx---fill-region activate)
   (when jsx--try-to-show-document-p
