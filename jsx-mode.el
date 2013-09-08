@@ -685,6 +685,20 @@ if there are any errors or warnings in `jsx-mode'."
     (write-region nil nil tmpfile nil 'silent)
     tmpfile))
 
+(defun jsx--sort-candidates (a b)
+  (string< (assoc-default 'word a) (assoc-default 'word b)))
+
+(defun jsx--make-method-string (method args return-type)
+  (format "%s(%s) : %s"
+          method
+          (mapconcat
+           (lambda (arg)
+             (format "%s : %s"
+                     (assoc-default 'name arg)
+                     (assoc-default 'type arg)))
+           args ", ")
+          return-type))
+
 (defun jsx--parse-candidates (str)
   ;; JSON example (cf. src/completion.jsx of JSX)
   ;; {
@@ -699,40 +713,29 @@ if there are any errors or warnings in `jsx-mode'."
   ;;   "definedLineNumber" : 903
   ;; }
   (let* ((json-array-type 'list)
-         (candidates-info (json-read-from-string str))
-         candidates word prev-word docs symbol)
-    (setq candidates-info
-          (sort candidates-info (lambda (a b)
-                                  (string< (assoc-default 'word a)
-                                           (assoc-default 'word b)))))
-    (while candidates-info
-      (let* ((info (car candidates-info))
-             (args (assq 'args info))
-             (desc (or (assoc-default 'doc info) "not documented"))
-             (name (setq word (assoc-default 'word info))))
-        (when (and prev-word (not (string= word prev-word)))
-          (setq candidates
-                (append candidates
-                        (list (propertize prev-word 'docs docs 'symbol symbol))))
-          (setq docs)
-          (setq symbol))
-        (when args
-          (setq symbol "f")
-          (setq name
-                (format "%s(%s) : %s"
-                        word
-                        (mapconcat
-                         (lambda (arg)
-                           (format "%s : %s"
-                                   (assoc-default 'name arg)
-                                   (assoc-default 'type arg)))
-                         (cdr args) ", ")
-                        (assoc-default 'returnType info))))
-        (setq docs (append docs `(((name . ,name) (desc . ,desc))))))
-      (setq prev-word word)
-      (setq candidates-info (cdr candidates-info)))
-    (append candidates
-            (list (propertize prev-word 'docs docs 'symbol symbol)))))
+         (candidates-info (json-read-from-string str)))
+    (setq candidates-info (sort candidates-info 'jsx--sort-candidates))
+    (loop with (candidates docs symbol)
+          for info in candidates-info
+          ;; (assoc-default 'args info) is nil if the method has no arguments
+          for args = (assq 'args info)
+          for desc = (or (assoc-default 'doc info) "not documented")
+          for prev-word = nil then word
+          for word = (assoc-default 'word info)
+          for name = word
+          when (and prev-word (not (equal word prev-word)))
+            collect (propertize prev-word 'docs docs 'symbol symbol)
+              into candidates
+            and do (setq docs)
+            and do (setq symbol)
+          do (when args
+               (setq symbol "f")
+               (setq name (jsx--make-method-string
+                           word (cdr args) (assoc-default 'returnType info))))
+          collect `((name . ,name) (desc . ,desc)) into docs
+          finally return
+                  (nconc candidates
+                         (list (propertize word 'docs docs 'symbol symbol))))))
 
 (defun jsx--get-candidates ()
   (let ((tmpfile (jsx--copy-buffer-to-tmp-file))
