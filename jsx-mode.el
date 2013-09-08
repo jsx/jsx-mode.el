@@ -738,7 +738,8 @@ if there are any errors or warnings in `jsx-mode'."
 (defun jsx--get-candidates ()
   (let* ((tmpfile (jsx--copy-buffer-to-tmp-file))
          (line (line-number-at-pos))
-         (col (1+ (current-column)))
+         ;; don't use (current-column) for tab indents
+         (col (1+ (- (point) (line-beginning-position))))
          (cmd (jsx--generate-cmd
                (list "--complete" (format "%d:%d" line col)  tmpfile))))
     (with-temp-buffer
