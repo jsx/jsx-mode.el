@@ -711,28 +711,29 @@ if there are any errors or warnings in `jsx-mode'."
   ;; }
   (let* ((json-array-type 'list)
          (candidates-info (json-read-from-string str)))
-    (setq candidates-info (sort candidates-info 'jsx--sort-candidates))
-    (loop with (candidates docs symbol)
-          for info in candidates-info
-          ;; (assoc-default 'args info) is nil if the method has no arguments
-          for args = (assq 'args info)
-          for desc = (or (assoc-default 'doc info) "not documented")
-          for prev-word = nil then word
-          for word = (assoc-default 'word info)
-          for name = word
-          when (and prev-word (not (equal word prev-word)))
-            collect (propertize prev-word 'docs docs 'symbol symbol)
-              into candidates
-            and do (setq docs)
-            and do (setq symbol)
-          do (when args
-               (setq symbol "f")
-               (setq name (jsx--make-method-string
-                           word (cdr args) (assoc-default 'returnType info))))
-          collect `((name . ,name) (desc . ,desc)) into docs
-          finally return
-                  (nconc candidates
-                         (list (propertize word 'docs docs 'symbol symbol))))))
+    (when candidates-info
+      (setq candidates-info (sort candidates-info 'jsx--sort-candidates))
+      (loop with (candidates docs symbol)
+            for info in candidates-info
+            ;; (assoc-default 'args info) is nil if the method has no arguments
+            for args = (assq 'args info)
+            for desc = (or (assoc-default 'doc info) "not documented")
+            for prev-word = nil then word
+            for word = (assoc-default 'word info)
+            for name = word
+            when (and prev-word (not (equal word prev-word)))
+              collect (propertize prev-word 'docs docs 'symbol symbol)
+                into candidates
+                and do (setq docs)
+                and do (setq symbol)
+            do (when args
+                 (setq symbol "f")
+                 (setq name (jsx--make-method-string
+                             word (cdr args) (assoc-default 'returnType info))))
+            collect `((name . ,name) (desc . ,desc)) into docs
+            finally return
+                    (nconc candidates
+                           (list (propertize word 'docs docs 'symbol symbol)))))))
 
 (defun jsx--get-candidates ()
   (let* ((tmpfile (jsx--copy-buffer-to-tmp-file))
