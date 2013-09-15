@@ -80,7 +80,7 @@
 (setq vc-handled-backends nil)
 (cd (file-name-directory load-file-name))
 (load (expand-file-name "./lib/test-util.el") nil t t)
-(load (expand-file-name "../jsx-mode.el") nil t t)
+(load (expand-file-name "../src/jsx-mode.el") nil t t)
 (add-to-list 'auto-mode-alist '("\\.jsx\\'" . jsx-mode))
 
 (if (run-test "jsx/font-face" "jsx"

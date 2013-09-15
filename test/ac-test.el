@@ -74,7 +74,7 @@
 
 (cd (file-name-directory load-file-name))
 (load (expand-file-name "./lib/test-util.el") nil t t)
-(load (expand-file-name "../jsx-mode.el") nil t t)
+(load (expand-file-name "../src/jsx-mode.el") nil t t)
 
 (if (run-test "ac" "txt"
               :get-test-suite-func 'ac-get-test-suite

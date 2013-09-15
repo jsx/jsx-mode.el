@@ -1,4 +1,4 @@
-TARGET=jsx-mode
+TARGET=src/jsx-mode
 ifdef DIR
 	OPT=-L $(DIR)
 endif
