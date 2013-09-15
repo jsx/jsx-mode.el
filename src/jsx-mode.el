@@ -741,6 +741,7 @@ if there are any errors or warnings in `jsx-mode'."
 (defvar jsx--candidates-buffer "*jsx-candidates-buffer*")
 (defvar jsx--complete-proc nil)
 (defvar jsx--clear-candidates-p nil)
+(defvar jsx--ac-point nil)
 
 
 (defun jsx--ac-prefix ()
@@ -820,7 +821,7 @@ if there are any errors or warnings in `jsx-mode'."
   (when jsx--candidates-cache
     ;; ac-init is called only once after the cache is set.
     ;; The cache should be cleared next time ac-init is called
-    (if (not jsx--clear-candidates-p)
+    (if (and (not jsx--clear-candidates-p) (eq jsx--ac-point ac-point))
         (setq jsx--clear-candidates-p t)
       (setq jsx--candidates-cache nil)
       (setq  jsx--clear-candidates-p nil))))
@@ -845,6 +846,7 @@ if there are any errors or warnings in `jsx-mode'."
 
 (defun jsx--get-candidates-async ()
   (when (and (null jsx--complete-proc) (null jsx--candidates-cache))
+    (setq jsx--ac-point ac-point)
     (let* ((tmpfile (jsx--copy-buffer-to-tmp-file))
            (line (line-number-at-pos))
            ;; don't use (current-column) for tab indents
