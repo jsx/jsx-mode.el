@@ -734,18 +734,29 @@ if there are any errors or warnings in `jsx-mode'."
     (prefix . jsx--ac-prefix)
     (cache)))
 
+(defvar jsx--get-candidates-sync-p nil)
+
+;; for jsx--get-candidates-async
+(defvar jsx--candidates-cache nil)
+(defvar jsx--candidates-buffer "*jsx-candidates-buffer*")
+(defvar jsx--complete-proc nil)
+(defvar jsx--clear-candidates-p nil)
+
+
 (defun jsx--ac-prefix ()
   "Enable completion even if after invisible characters."
   (or (ac-prefix-default) (point)))
 
 (defadvice auto-complete (before jsx--add-requires-to-ac-source activate)
   "Invoke completion whenever auto-complete is executed."
-  (if (string= major-mode "jsx-mode")
-      (add-to-list 'jsx-ac-source '(requires . 0))))
+  (when (eq major-mode 'jsx-mode)
+    (add-to-list 'jsx-ac-source '(requires . 0))
+    (setq jsx--get-candidates-sync-p t)))
 
 (defadvice auto-complete (after jsx--remove-requires-from-ac-source activate)
-  (if (string= major-mode "jsx-mode")
-      (setq jsx-ac-source (delete '(requires . 0) jsx-ac-source))))
+  (when (eq major-mode 'jsx-mode)
+    (setq jsx-ac-source (delete '(requires . 0) jsx-ac-source))
+    (setq jsx--get-candidates-sync-p nil)))
 
 (defun jsx--copy-buffer-to-tmp-file ()
   (let ((tmpfile (make-temp-name (concat (buffer-file-name) "."))))
@@ -805,7 +816,21 @@ if there are any errors or warnings in `jsx-mode'."
                     (nconc candidates
                            (list (propertize word 'docs docs 'symbol symbol)))))))
 
+(defadvice ac-init (before jsx--ac-init activate)
+  (when jsx--candidates-cache
+    ;; ac-init is called only once after the cache is set.
+    ;; The cache should be cleared next time ac-init is called
+    (if (not jsx--clear-candidates-p)
+        (setq jsx--clear-candidates-p t)
+      (setq jsx--candidates-cache nil)
+      (setq  jsx--clear-candidates-p nil))))
+
 (defun jsx--get-candidates ()
+  (if jsx--get-candidates-sync-p
+      (jsx--get-candidates-sync)
+    (jsx--get-candidates-async)))
+
+(defun jsx--get-candidates-sync ()
   (let* ((tmpfile (jsx--copy-buffer-to-tmp-file))
          (line (line-number-at-pos))
          ;; don't use (current-column) for tab indents
@@ -817,6 +842,26 @@ if there are any errors or warnings in `jsx-mode'."
           (call-process-shell-command cmd nil t)
         (delete-file tmpfile))
       (jsx--parse-candidates (buffer-string)))))
+
+(defun jsx--get-candidates-async ()
+  (when (and (null jsx--complete-proc) (null jsx--candidates-cache))
+    (let* ((tmpfile (jsx--copy-buffer-to-tmp-file))
+           (line (line-number-at-pos))
+           ;; don't use (current-column) for tab indents
+           (col (1+ (- (point) (line-beginning-position))))
+           (options (append jsx-cmd-options
+                            (list "--complete" (format "%d:%d" line col)  tmpfile))))
+      (setq jsx--complete-proc
+            (apply 'start-process "jsx" jsx--candidates-buffer jsx-cmd options))
+      (set-process-sentinel jsx--complete-proc 'jsx--set-cache)))
+  jsx--candidates-cache)
+
+(defun jsx--set-cache (process signal)
+  (with-current-buffer jsx--candidates-buffer
+    (delete-file (car (last (process-command jsx--complete-proc))))
+    (setq jsx--complete-proc nil)
+    (setq jsx--candidates-cache (jsx--parse-candidates (buffer-string))))
+  (kill-buffer jsx--candidates-buffer))
 
 (defadvice fill-region (before jsx--fill-region activate)
   "Preserve the line feeds in documents
