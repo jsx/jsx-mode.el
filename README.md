@@ -1,4 +1,4 @@
-# jsx-mode.el --- major mode for JSX
+# jsx-mode.el --- major mode for [JSX](https://github.com/jsx/JSX), an altJS
 
 ## USAGE
 ### Get Started
