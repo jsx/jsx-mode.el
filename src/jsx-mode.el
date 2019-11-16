@@ -1,4 +1,4 @@
-;;; jsx-mode.el --- major mode for JSX
+;;; jsx-mode.el --- major mode for JSX, an altJS
 
 ;; Copyright (c) 2012 DeNA, Co., Ltd (http://dena.jp/intl/)
 
