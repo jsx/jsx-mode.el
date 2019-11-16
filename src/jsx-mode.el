@@ -822,8 +822,9 @@ if there are any errors or warnings in `jsx-mode'."
   "Preserve the line feeds in documents
 cf. https://github.com/auto-complete/popup-el/issues/43"
   (when jsx--try-to-show-document-p
-    (beginning-of-buffer)
-    (replace-string "\n" jsx--hard-line-feed)
+    (goto-char (point-min))
+    (while (search-forward "\n") 
+           (replace-match jsx--hard-line-feed))
     (setq use-hard-newlines t)))
 
 (defun jsx--sort-docs (a b)
